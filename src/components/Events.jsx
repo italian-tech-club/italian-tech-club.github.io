@@ -9,12 +9,13 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
     rel="noopener noreferrer"
     initial={{ opacity: 0, x: -20 }}
     whileInView={{ opacity: 1, x: 0 }}
+    whileHover={!isPast ? { y: -4 } : {}}
     viewport={{ once: true }}
-    transition={{ delay, duration: 0.5 }}
-    className={`flex flex-col md:flex-row gap-6 items-start md:items-center p-6 rounded-2xl border transition-all group relative overflow-hidden ${
+    transition={{ delay, duration: 0.5, ease: "easeOut" }}
+    className={`flex flex-col md:flex-row gap-6 items-start md:items-center p-6 rounded-2xl border transition-shadow transition-colors group relative overflow-hidden ${
       isPast 
         ? 'bg-slate-50 border-slate-100 opacity-80 hover:opacity-100' 
-        : 'bg-white border-slate-200 shadow-sm hover:shadow-xl hover:border-itc-green/30 hover:-translate-y-1'
+        : 'bg-white border-slate-200 shadow-sm hover:shadow-xl hover:border-itc-green/30'
     }`}
   >
     <div className={`flex-shrink-0 w-20 h-20 rounded-xl flex flex-col items-center justify-center border ${
@@ -81,6 +82,7 @@ const Events = () => {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
                 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4"
             >
                 Events
@@ -89,7 +91,7 @@ const Events = () => {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
+                transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
                 className="text-lg text-slate-600 max-w-2xl"
             >
               Join our exclusive gatherings in the heart of New York City. 

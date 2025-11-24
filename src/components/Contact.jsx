@@ -15,6 +15,7 @@ const Contact = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Get in Touch</h2>
             <p className="text-lg text-slate-300 mb-8 leading-relaxed">
@@ -44,7 +45,7 @@ const Contact = () => {
              initial={{ opacity: 0, y: 20 }}
              whileInView={{ opacity: 1, y: 0 }}
              viewport={{ once: true }}
-             transition={{ delay: 0.2 }}
+             transition={{ delay: 0.2, duration: 0.6, ease: "easeOut" }}
              className="bg-gradient-to-br from-white to-slate-100 rounded-3xl p-10 text-slate-900 shadow-2xl relative overflow-hidden group"
           >
              <div className="absolute top-0 right-0 w-64 h-64 bg-itc-green/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-itc-green/20 transition-colors duration-500"></div>

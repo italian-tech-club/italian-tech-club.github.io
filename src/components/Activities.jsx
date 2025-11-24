@@ -7,8 +7,8 @@ const ActivityCard = ({ icon: Icon, title, description, colorClass, delay }) => 
     initial={{ opacity: 0, y: 30 }}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
-    transition={{ duration: 0.6, delay }}
-    className="relative group rounded-3xl p-8 bg-white border border-slate-200 hover:border-transparent hover:shadow-2xl transition-all duration-300"
+    transition={{ duration: 0.5, delay }}
+    className="relative group rounded-3xl p-8 bg-white border border-slate-200 hover:border-transparent hover:shadow-2xl transition-shadow transition-colors duration-300"
   >
     <div className={`absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-5 transition-opacity duration-300 ${colorClass}`} />
     <div className="relative z-10">
