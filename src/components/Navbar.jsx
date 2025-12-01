@@ -26,7 +26,7 @@ const Navbar = () => {
             <span className="font-bold text-xl tracking-tight text-slate-900 hidden sm:block border-l border-slate-300 pl-6 py-1">NYC Chapter</span>
           </div>
           <div className="hidden md:flex items-center space-x-8">
-            {['Who we are', 'What we do', 'Events'].map((item) => (
+            {['Who we are', 'What we do', 'Events', 'Team'].map((item) => (
               <a 
                 key={item}
                 href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}

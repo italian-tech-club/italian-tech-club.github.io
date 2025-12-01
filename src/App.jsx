@@ -4,6 +4,7 @@ import Hero from './components/Hero';
 import About from './components/About';
 import Activities from './components/Activities';
 import Events from './components/Events';
+import Team from './components/Team';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 
@@ -16,6 +17,7 @@ function App() {
         <About />
         <Activities />
         <Events />
+        <Team />
         <Contact />
       </main>
       <Footer />
