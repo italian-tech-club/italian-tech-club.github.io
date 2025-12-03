@@ -20,12 +20,12 @@ const Footer = () => {
           {/* Brand Section */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-4 w-6 opacity-80">
-                 <div className="w-1/3 bg-itc-green h-full"></div>
-                 <div className="w-1/3 bg-white h-full"></div>
-                 <div className="w-1/3 bg-itc-red h-full"></div>
-              </div>
-              <span className="font-bold text-white tracking-tight">ITC NYC</span>
+            <div className="flex h-4 w-6 opacity-80">
+               <div className="w-1/3 bg-itc-green h-full"></div>
+               <div className="w-1/3 bg-white h-full"></div>
+               <div className="w-1/3 bg-itc-red h-full"></div>
+            </div>
+            <span className="font-bold text-white tracking-tight">ITC NYC</span>
             </div>
             <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
               Connecting Italian professionals in the world's most vibrant tech ecosystem.
@@ -50,8 +50,8 @@ const Footer = () => {
               ))}
             </div>
           </div>
-        </div>
-
+          </div>
+          
         {/* Copyright */}
         <div className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-sm opacity-60">
           <div>

@@ -104,34 +104,49 @@ const Events = () => {
           {/* Upcoming Event */}
           <div className="mb-12">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Upcoming</h3>
-              <EventCard 
-                date="02" 
-                month="DEC" 
-                title="Tech Talk & Networking" 
-                subtitle="Interview with Gianluca Galletto (I³/NYC Chairman)"
-                location="Impact Hub, 417 5th Ave, New York" 
-                time="6:30 PM - 9:00 PM"
-                type="Talk"
-                link="https://www.gomry.com/event/ITC-Tech-Talk-with-Gianluca-Galletto-jeudT5z4fNweUMXG1TNs"
-                isPast={true}
-                delay={0.2}
-              />
+              <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+                  <h4 className="text-xl font-bold text-slate-900 mb-2">No upcoming events at the moment</h4>
+                  <p className="text-slate-600 mb-6">
+                      We are working on the next gathering. Follow us to get notified when new events are announced.
+                  </p>
+                  <a 
+                      href="https://www.gomry.com/club/italian-tech-club"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 text-white font-bold hover:bg-itc-green transition-colors"
+                  >
+                      Join the Club
+                  </a>
+              </div>
           </div>
 
           {/* Past Events */}
           <div>
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Past Events</h3>
-              <EventCard 
-                date="18" 
-                month="SEP" 
-                title="NYC Chapter Launch" 
-                subtitle="First Italian Tech Club gathering in New York"
-                location="New York, NY" 
-                type="Launch Party"
-                link="https://www.gomry.com/event/Italian-Tech-Club-NYC-Launch-Event-OqmdwP5JnVu5VnXjupdY"
-                isPast={true}
-                delay={0.3}
-              />
+              <div className="space-y-6">
+                <EventCard 
+                    date="02" 
+                    month="DEC" 
+                    title="Tech Talk & Networking" 
+                    subtitle="Interview with Gianluca Galletto (I³/NYC Chairman)"
+                    location="Impact Hub, 417 5th Ave, New York" 
+                    type="Talk"
+                    link="https://www.gomry.com/event/ITC-Tech-Talk-with-Gianluca-Galletto-jeudT5z4fNweUMXG1TNs"
+                    isPast={true}
+                    delay={0.2}
+                />
+                <EventCard 
+                    date="18" 
+                    month="SEP" 
+                    title="NYC Chapter Launch" 
+                    subtitle="First Italian Tech Club gathering in New York"
+                    location="New York, NY" 
+                    type="Launch Party"
+                    link="https://www.gomry.com/event/Italian-Tech-Club-NYC-Launch-Event-OqmdwP5JnVu5VnXjupdY"
+                    isPast={true}
+                    delay={0.3}
+                />
+              </div>
           </div>
         </div>
       </div>
