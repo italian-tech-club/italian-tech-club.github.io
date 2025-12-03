@@ -111,9 +111,9 @@ const Events = () => {
                 subtitle="Interview with Gianluca Galletto (I³/NYC Chairman)"
                 location="Impact Hub, 417 5th Ave, New York" 
                 time="6:30 PM - 9:00 PM"
-                type="Networking"
+                type="Talk"
                 link="https://www.gomry.com/event/ITC-Tech-Talk-with-Gianluca-Galletto-jeudT5z4fNweUMXG1TNs"
-                isPast={false}
+                isPast={true}
                 delay={0.2}
               />
           </div>
