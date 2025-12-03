@@ -11,7 +11,30 @@ const teamMembers = [
   { name: 'Michela Tarantino', linkedin: 'https://www.linkedin.com/in/michela-tarantino/' },
 ];
 
-const TeamCard = ({ name, linkedin, index }) => {
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.3,
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut"
+    }
+  }
+};
+
+const TeamCard = ({ name, linkedin }) => {
     const initials = name.split(' ').map(n => n[0]).join('');
     
     return (
@@ -19,10 +42,7 @@ const TeamCard = ({ name, linkedin, index }) => {
             href={linkedin}
             target="_blank"
             rel="noopener noreferrer"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: index * 0.1, duration: 0.5, ease: "easeOut" }}
+            variants={itemVariants}
             className="group bg-white p-6 rounded-2xl border border-slate-200 hover:border-itc-green/50 hover:shadow-lg transition-all duration-300 flex items-center gap-4"
         >
             <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-900 font-bold text-lg group-hover:bg-itc-green group-hover:text-white transition-colors duration-300">
@@ -65,15 +85,20 @@ const Team = () => {
           </motion.p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {teamMembers.map((member, index) => (
-            <TeamCard key={member.name} {...member} index={index} />
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-50px" }}
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {teamMembers.map((member) => (
+            <TeamCard key={member.name} {...member} />
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
 };
 
 export default Team;
-
