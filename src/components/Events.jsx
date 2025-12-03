@@ -110,7 +110,7 @@ const Events = () => {
                       We are working on the next gathering. Follow us to get notified when new events are announced.
                   </p>
                   <a 
-                      href="https://www.gomry.com/club/italian-tech-club"
+                      href="https://www.gomry.com/form/Italian-Tech-Club-General-application-form-68uJSn7PbLmevuO2T0c5"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 text-white font-bold hover:bg-itc-green transition-colors"
