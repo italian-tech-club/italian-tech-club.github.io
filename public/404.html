@@ -1,23 +1,393 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Italian Tech Club NYC</title>
-    <script type="text/javascript">
-      // Single Page Apps for GitHub Pages
-      // https://github.com/rafgraph/spa-github-pages
-      var pathSegmentsToKeep = 0;
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 - Page Not Found | Italian Tech Club NYC</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-      var l = window.location;
-      l.replace(
-        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
-        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash
-      );
-    </script>
+    :root {
+      --itc-green: #009246;
+      --itc-red: #CE2B37;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-600: #475569;
+      --slate-900: #0f172a;
+    }
+
+    body {
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      background: var(--slate-50);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Animated Background Blobs */
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      mix-blend-mode: multiply;
+      animation: blob 7s infinite;
+      opacity: 0.6;
+    }
+
+    .blob-1 {
+      width: 40rem;
+      height: 40rem;
+      background: rgba(0, 146, 70, 0.15);
+      top: -10rem;
+      left: -10rem;
+    }
+
+    .blob-2 {
+      width: 35rem;
+      height: 35rem;
+      background: rgba(206, 43, 55, 0.15);
+      top: -5rem;
+      right: -10rem;
+      animation-delay: 2s;
+    }
+
+    .blob-3 {
+      width: 30rem;
+      height: 30rem;
+      background: rgba(226, 232, 240, 0.8);
+      bottom: -10rem;
+      left: 20%;
+      animation-delay: 4s;
+    }
+
+    @keyframes blob {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -50px) scale(1.1); }
+      66% { transform: translate(-20px, 20px) scale(0.9); }
+    }
+
+    /* Main Content */
+    .container {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      padding: 2rem;
+      max-width: 600px;
+    }
+
+    /* Animated 404 Number */
+    .error-code {
+      font-size: clamp(8rem, 25vw, 14rem);
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 1rem;
+      position: relative;
+      display: inline-block;
+    }
+
+    .error-code span {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--itc-green), var(--slate-900), var(--itc-red));
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: gradient 8s ease infinite, bounce 2s ease-in-out infinite;
+    }
+
+    .error-code span:nth-child(1) { animation-delay: 0s, 0s; }
+    .error-code span:nth-child(2) { animation-delay: 0s, 0.2s; }
+    .error-code span:nth-child(3) { animation-delay: 0s, 0.4s; }
+
+    @keyframes gradient {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* Pasta Animation */
+    .pasta-container {
+      position: relative;
+      height: 80px;
+      margin: 1.5rem auto;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .spaghetti {
+      width: 4px;
+      height: 60px;
+      background: linear-gradient(to bottom, #f4d03f, #e6b91e);
+      border-radius: 2px;
+      animation: wiggle 1.5s ease-in-out infinite;
+      transform-origin: top center;
+    }
+
+    .spaghetti:nth-child(1) { animation-delay: 0s; height: 55px; }
+    .spaghetti:nth-child(2) { animation-delay: 0.1s; height: 60px; }
+    .spaghetti:nth-child(3) { animation-delay: 0.2s; height: 50px; }
+    .spaghetti:nth-child(4) { animation-delay: 0.3s; height: 58px; }
+    .spaghetti:nth-child(5) { animation-delay: 0.4s; height: 52px; }
+    .spaghetti:nth-child(6) { animation-delay: 0.5s; height: 62px; }
+    .spaghetti:nth-child(7) { animation-delay: 0.6s; height: 48px; }
+
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(-3deg); }
+      50% { transform: rotate(3deg); }
+    }
+
+    .fork {
+      font-size: 2.5rem;
+      animation: twirl 3s ease-in-out infinite;
+      display: inline-block;
+      margin-left: 10px;
+    }
+
+    @keyframes twirl {
+      0%, 100% { transform: rotate(-15deg); }
+      50% { transform: rotate(15deg); }
+    }
+
+    /* Text Styles */
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 0.75rem;
+      animation: fadeInUp 0.8s ease-out 0.2s both;
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--slate-600);
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.8s ease-out 0.4s both;
+      line-height: 1.6;
+    }
+
+    .italian-phrase {
+      font-style: italic;
+      color: var(--itc-green);
+      font-weight: 600;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Buttons */
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      animation: fadeInUp 0.8s ease-out 0.6s both;
+    }
+
+    @media (min-width: 480px) {
+      .buttons {
+        flex-direction: row;
+        justify-content: center;
+      }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      border-radius: 9999px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--slate-900);
+      color: white;
+      box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--itc-red);
+      transform: translateY(-3px);
+      box-shadow: 0 15px 35px -10px rgba(206, 43, 55, 0.4);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--slate-900);
+      border: 1px solid var(--slate-200);
+      box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--itc-green);
+      color: var(--itc-green);
+      transform: translateY(-3px);
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px;
+      transition: transform 0.3s ease;
+    }
+
+    .btn-primary:hover svg {
+      transform: translateX(4px);
+    }
+
+    /* Floating Elements */
+    .floating-emoji {
+      position: absolute;
+      font-size: 2rem;
+      animation: float 6s ease-in-out infinite;
+      opacity: 0.7;
+      z-index: 1;
+    }
+
+    .emoji-1 { top: 15%; left: 10%; animation-delay: 0s; }
+    .emoji-2 { top: 25%; right: 15%; animation-delay: 1s; }
+    .emoji-3 { bottom: 20%; left: 15%; animation-delay: 2s; }
+    .emoji-4 { bottom: 30%; right: 10%; animation-delay: 3s; }
+    .emoji-5 { top: 40%; left: 5%; animation-delay: 4s; }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-15px) rotate(5deg); }
+      75% { transform: translateY(10px) rotate(-5deg); }
+    }
+
+    /* Italian Flag Stripe at Bottom */
+    .flag-stripe {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      display: flex;
+    }
+
+    .flag-stripe div {
+      flex: 1;
+    }
+
+    .flag-green { background: var(--itc-green); }
+    .flag-white { background: white; }
+    .flag-red { background: var(--itc-red); }
+
+    /* Logo */
+    .logo {
+      position: fixed;
+      top: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+    }
+
+    .logo img {
+      height: 40px;
+      width: auto;
+    }
+  </style>
   </head>
   <body>
+  <!-- Logo -->
+  <a href="/" class="logo">
+    <img src="/logo.png" alt="Italian Tech Club NYC">
+  </a>
+
+  <!-- Background Blobs -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <!-- Floating Emojis -->
+  <div class="floating-emoji emoji-1">🍕</div>
+  <div class="floating-emoji emoji-2">🚀</div>
+  <div class="floating-emoji emoji-3">💻</div>
+  <div class="floating-emoji emoji-4">🇮🇹</div>
+  <div class="floating-emoji emoji-5">☕</div>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div class="error-code">
+      <span>4</span><span>0</span><span>4</span>
+    </div>
+
+    <div class="pasta-container">
+      <div class="spaghetti"></div>
+      <div class="spaghetti"></div>
+      <div class="spaghetti"></div>
+      <div class="spaghetti"></div>
+      <div class="spaghetti"></div>
+      <div class="spaghetti"></div>
+      <div class="spaghetti"></div>
+      <span class="fork">🍴</span>
+    </div>
+
+    <h1>Oops! This page is <em>al dente</em></h1>
+    <p class="subtitle">
+      Looks like this page got lost somewhere between Rome and NYC.<br>
+      <span class="italian-phrase">"Chi cerca, trova!"</span> — Let's get you back on track.
+    </p>
+
+    <div class="buttons">
+      <a href="/" class="btn btn-primary">
+        Back to Home
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+      <a href="/#contact" class="btn btn-secondary">
+        Contact Us
+      </a>
+    </div>
+  </div>
+
+  <!-- Italian Flag Stripe -->
+  <div class="flag-stripe">
+    <div class="flag-green"></div>
+    <div class="flag-white"></div>
+    <div class="flag-red"></div>
+  </div>
+
+  <script>
+    // Single Page Apps for GitHub Pages - preserving for SPA routing
+    (function() {
+      var redirect = sessionStorage.redirect;
+      delete sessionStorage.redirect;
+      if (redirect && redirect !== location.href) {
+        history.replaceState(null, null, redirect);
+      }
+    })();
+  </script>
   </body>
 </html>
