@@ -200,19 +200,24 @@ const ProfileModal = ({ profile, onClose, onLike, hasLiked }) => {
 };
 
 // Profile Card Component
-const ProfileCard = ({ profile, onClick }) => {
+const ProfileCard = ({ profile, onClick, index = 0 }) => {
   const roleConfig = ROLE_CONFIG[profile.role] || ROLE_CONFIG.technical;
   const stageConfig = STAGE_CONFIG[profile.stage] || STAGE_CONFIG.exploring;
   const firstPrompt = Object.entries(profile.prompts || {}).find(([_, v]) => v?.trim());
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ 
+        duration: 0.3,
+        delay: Math.min(index * 0.05, 0.4),
+        ease: [0.25, 0.1, 0.25, 1]
+      }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
       onClick={onClick}
-      className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 group"
+      className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-xl transition-shadow duration-300 group"
     >
       {/* Photo */}
       <div className="relative aspect-[4/5] overflow-hidden">
@@ -503,20 +508,18 @@ const CoFounderProfiles = () => {
 
         {/* Profiles Grid */}
         {!loading && !error && filteredProfiles.length > 0 && (
-          <motion.div 
-            layout
-            className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
-          >
-            <AnimatePresence>
-              {filteredProfiles.map(profile => (
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
+            <AnimatePresence mode="popLayout">
+              {filteredProfiles.map((profile, index) => (
                 <ProfileCard 
                   key={profile._id} 
                   profile={profile} 
+                  index={index}
                   onClick={() => openProfile(profile)}
                 />
               ))}
             </AnimatePresence>
-          </motion.div>
+          </div>
         )}
 
         {/* Footer CTA */}
