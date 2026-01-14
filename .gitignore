@@ -39,3 +39,4 @@ build
 
 # Vite
 public/mockServiceWorker.js
+.vercel

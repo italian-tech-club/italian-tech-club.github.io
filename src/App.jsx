@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import About from './components/About';
@@ -7,8 +8,10 @@ import Events from './components/Events';
 import Team from './components/Team';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
+import CoFounderMatching from './components/CoFounderMatching';
 
-function App() {
+// Homepage component with all sections
+const HomePage = () => {
   useEffect(() => {
     // Handle hash navigation on load
     if (window.location.hash) {
@@ -36,7 +39,22 @@ function App() {
       <Footer />
     </div>
   );
+};
+
+function App() {
+  const location = useLocation();
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/cofounder-matching" element={<CoFounderMatching />} />
+    </Routes>
+  );
 }
 
 export default App;
-
