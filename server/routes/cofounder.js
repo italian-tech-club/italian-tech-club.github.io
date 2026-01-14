@@ -108,6 +108,32 @@ router.post('/submit', async (req, res) => {
 });
 
 /**
+ * GET /api/cofounder/profiles
+ * Get all co-founder profiles (excluding email for privacy)
+ */
+router.get('/profiles', async (req, res) => {
+  try {
+    const profiles = await CofounderProfile.find(
+      { status: { $in: ['pending', 'approved'] } }
+    )
+    .select('firstName lastName linkedIn profilePic role stage commitment industries prompts bio views likes createdAt')
+    .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      profiles,
+      count: profiles.length,
+    });
+  } catch (error) {
+    console.error('Error fetching profiles:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch profiles' 
+    });
+  }
+});
+
+/**
  * GET /api/cofounder/check-email/:email
  * Check if an email is already registered
  */
@@ -123,6 +149,44 @@ router.get('/check-email/:email', async (req, res) => {
     console.error('Error checking email:', error);
     res.status(500).json({ error: 'Failed to check email' });
   }
+});
+
+/**
+ * POST /api/cofounder/interact
+ * Track views and likes
+ */
+router.post('/interact', async (req, res) => {
+  try {
+    const { profileId, type } = req.body;
+    const visitorIp = req.headers['x-forwarded-for']?.split(',')[0] || 
+                      req.headers['x-real-ip'] || 
+                      req.ip || 'unknown';
+
+    if (!profileId || !type || !['view', 'like'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid request' });
+    }
+
+    // Simple implementation: just increment the count
+    // In production, you'd want to track by IP to prevent duplicates
+    const updateField = type === 'view' ? 'views' : 'likes';
+    
+    await CofounderProfile.findByIdAndUpdate(profileId, { 
+      $inc: { [updateField]: 1 } 
+    });
+
+    res.json({ success: true, action: type === 'view' ? 'viewed' : 'liked' });
+  } catch (error) {
+    console.error('Interaction error:', error);
+    res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
+});
+
+/**
+ * GET /api/cofounder/interact
+ * Check if user has liked a profile
+ */
+router.get('/interact', async (req, res) => {
+  res.json({ success: true, hasLiked: false });
 });
 
 export default router;

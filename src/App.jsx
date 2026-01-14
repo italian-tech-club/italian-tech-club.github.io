@@ -9,6 +9,7 @@ import Team from './components/Team';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import CoFounderMatching from './components/CoFounderMatching';
+import CoFounderProfiles from './components/CoFounderProfiles';
 
 // Homepage component with all sections
 const HomePage = () => {
@@ -53,6 +54,7 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/cofounder-matching" element={<CoFounderMatching />} />
+      <Route path="/cofounders" element={<CoFounderProfiles />} />
     </Routes>
   );
 }

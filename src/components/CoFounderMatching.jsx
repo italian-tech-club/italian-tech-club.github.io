@@ -11,8 +11,10 @@ import {
   Check,
   AlertCircle,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Crop
 } from 'lucide-react';
+import ImageCropper from './ImageCropper';
 
 const PROFILE_PIC_SIZE = 400; // Required dimensions in pixels
 const MAX_FILE_SIZE_MB = 5;
@@ -92,6 +94,8 @@ const CoFounderMatching = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleInputChange = (e) => {
@@ -146,7 +150,7 @@ const CoFounderMatching = () => {
       return;
     }
 
-    // Create preview and validate dimensions
+    // Validate minimum dimensions before opening cropper
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -158,11 +162,9 @@ const CoFounderMatching = () => {
           }));
           return;
         }
-        setFormData(prev => ({
-          ...prev,
-          profilePic: file,
-          profilePicPreview: event.target?.result
-        }));
+        // Open cropper
+        setSelectedFile(file);
+        setShowCropper(true);
         setErrors(prev => ({ ...prev, profilePic: null }));
       };
       img.src = event.target?.result;
@@ -172,6 +174,22 @@ const CoFounderMatching = () => {
 
   const removeProfilePic = () => {
     setFormData(prev => ({ ...prev, profilePic: null, profilePicPreview: null }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCropComplete = (croppedImageBase64) => {
+    setFormData(prev => ({
+      ...prev,
+      profilePic: croppedImageBase64,
+      profilePicPreview: croppedImageBase64
+    }));
+    setShowCropper(false);
+    setSelectedFile(null);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -279,6 +297,15 @@ const CoFounderMatching = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+      {/* Image Cropper Modal */}
+      {showCropper && selectedFile && (
+        <ImageCropper
+          imageFile={selectedFile}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
+
       {/* Background Effects */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/8 rounded-full blur-3xl" />

@@ -91,6 +91,16 @@ const cofounderProfileSchema = new mongoose.Schema({
     default: '',
   },
 
+  // Engagement
+  views: {
+    type: Number,
+    default: 0,
+  },
+  likes: {
+    type: Number,
+    default: 0,
+  },
+
   // Metadata
   status: {
     type: String,
