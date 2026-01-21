@@ -1,0 +1,35 @@
+[
+  {
+    "date": "2026-02-12",
+    "title": "Tech Lovers",
+    "subtitle": "A relaxed aperitivo for founders, engineers, and tech enthusiasts",
+    "location": "Audace, 365 Park Ave S, New York, NY 10016",
+    "time": "6:30 PM - 10:00 PM",
+    "type": "Networking",
+    "link": "https://www.gomry.com/event/XCtLvyyiPpzibMjobMis?utm_source=website",
+    "poster": "/images/events/tech-lovers-2026/poster.png",
+    "gallery": []
+  },
+  {
+    "date": "2025-12-02",
+    "title": "Tech Talk & Networking",
+    "subtitle": "Interview with Gianluca Galletto (I³/NYC Chairman)",
+    "location": "Impact Hub, 417 5th Ave, New York",
+    "time": "7:00 PM - 9:30 PM",
+    "type": "Talk",
+    "link": "https://www.gomry.com/event/ITC-Tech-Talk-with-Gianluca-Galletto-jeudT5z4fNweUMXG1TNs",
+    "poster": "/images/events/tech-talk-dec-2025/poster.png",
+    "gallery": ["/images/events/tech-talk-dec-2025/img1.png", "/images/events/tech-talk-dec-2025/img2.png", "/images/events/tech-talk-dec-2025/img3.png", "/images/events/tech-talk-dec-2025/img4.png", "/images/events/tech-talk-dec-2025/img5.png"]
+  },
+  {
+    "date": "2025-09-18",
+    "title": "NYC Chapter Launch",
+    "subtitle": "First Italian Tech Club gathering in New York",
+    "location": "New York, NY",
+    "time": null,
+    "type": "Launch Party",
+    "link": "https://www.gomry.com/event/Italian-Tech-Club-NYC-Launch-Event-OqmdwP5JnVu5VnXjupdY",
+    "poster": "/images/events/launch-sep-2025/poster.png",
+    "gallery": ["/images/events/launch-sep-2025/img1.jpg", "/images/events/launch-sep-2025/img2.jpg"]
+  }
+]
