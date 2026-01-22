@@ -29,10 +29,19 @@ const Hero = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       {/* Background Effects */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-         <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/10 dark:bg-itc-green/30 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal animate-blob opacity-70" />
-         <div className="absolute top-0 -right-40 w-[40rem] h-[40rem] bg-itc-red/10 dark:bg-itc-red/30 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal animate-blob animation-delay-2000 opacity-70" />
-         <div className="absolute -bottom-40 left-20 w-[40rem] h-[40rem] bg-slate-200/50 dark:bg-slate-800/50 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal animate-blob animation-delay-4000 opacity-70" />
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+         {/* Green Blob */}
+         <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] animate-blob mix-blend-multiply dark:mix-blend-normal opacity-70"
+              style={{ background: 'radial-gradient(circle, rgba(0,146,70,0.2) 0%, rgba(0,146,70,0) 70%)' }}>
+         </div>
+         {/* Red Blob */}
+         <div className="absolute top-0 -right-40 w-[40rem] h-[40rem] animate-blob animation-delay-2000 mix-blend-multiply dark:mix-blend-normal opacity-70"
+              style={{ background: 'radial-gradient(circle, rgba(206,43,55,0.2) 0%, rgba(206,43,55,0) 70%)' }}>
+         </div>
+         {/* Slate Blob */}
+         <div className="absolute -bottom-40 left-20 w-[40rem] h-[40rem] animate-blob animation-delay-4000 mix-blend-multiply dark:mix-blend-normal opacity-70"
+              style={{ background: 'radial-gradient(circle, rgba(148,163,184,0.2) 0%, rgba(148,163,184,0) 70%)' }}>
+         </div>
       </div>
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
