@@ -8,15 +8,15 @@ const ActivityCard = ({ icon: Icon, title, description, colorClass, delay }) => 
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
     transition={{ duration: 0.5, delay }}
-    className="relative group rounded-3xl p-8 bg-white border border-slate-200 hover:border-transparent hover:shadow-2xl transition-shadow transition-colors duration-300"
+    className="relative group rounded-3xl p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-transparent hover:shadow-2xl transition-shadow transition-colors duration-300"
   >
     <div className={`absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-5 transition-opacity duration-300 ${colorClass}`} />
     <div className="relative z-10">
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${colorClass} bg-opacity-10 text-slate-900`}>
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${colorClass} bg-opacity-10 dark:bg-opacity-20 text-slate-900 dark:text-white`}>
         <Icon className="w-7 h-7" />
       </div>
-      <h3 className="text-2xl font-bold text-slate-900 mb-4">{title}</h3>
-      <p className="text-slate-600 leading-relaxed">
+      <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">{title}</h3>
+      <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
         {description}
       </p>
     </div>
@@ -25,11 +25,11 @@ const ActivityCard = ({ icon: Icon, title, description, colorClass, delay }) => 
 
 const Activities = () => {
   return (
-    <section id="what-we-do" className="py-24 bg-slate-50">
+    <section id="what-we-do" className="py-24 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">What We Do</h2>
-          <p className="text-lg text-slate-600">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">What We Do</h2>
+          <p className="text-lg text-slate-600 dark:text-slate-400">
             We foster a vibrant ecosystem through three key pillars designed to support your professional journey.
           </p>
         </div>
@@ -46,7 +46,7 @@ const Activities = () => {
             icon={Users2}
             title="Meet"
             description="Bond with fellow professionals in our networking events. We organize monthly dining events and meetups in the heart of NYC."
-            colorClass="bg-slate-900"
+            colorClass="bg-slate-900 dark:bg-white"
             delay={0.2}
           />
           <ActivityCard

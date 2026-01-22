@@ -106,21 +106,21 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
   
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay, duration: 0.5, ease: "easeOut" }}
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ delay, duration: 0.8, ease: "easeOut" }}
       className={`flex flex-col md:flex-row gap-6 items-start md:items-center p-6 rounded-2xl border transition-all duration-300 group relative overflow-hidden ${
         isPast 
-          ? 'bg-slate-50 border-slate-100' 
-          : 'bg-white border-slate-200 shadow-sm hover:shadow-xl hover:border-itc-green/30'
+          ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800' 
+          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-itc-green/30 dark:hover:border-itc-green/30'
       }`}
     >
       {/* Poster */}
       {poster && (
         <div 
           onClick={() => hasGallery && onOpenGallery({ title, gallery })}
-          className={`flex-shrink-0 w-32 h-auto rounded-xl overflow-hidden shadow-sm border border-slate-100 ${hasGallery ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+          className={`flex-shrink-0 w-32 h-auto rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 ${hasGallery ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
         >
           <img 
             src={poster} 
@@ -133,34 +133,34 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
       {/* Date Box (Only shown if no poster) */}
       {!poster && (
         <div className={`flex-shrink-0 w-20 h-20 rounded-xl flex flex-col items-center justify-center border ${
-          isPast ? 'bg-slate-100 border-slate-200' : 'bg-white border-slate-100 shadow-inner'
+          isPast ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-inner'
         }`}>
-          <span className={`text-xs font-bold uppercase tracking-wider ${isPast ? 'text-slate-500' : 'text-itc-red'}`}>{month}</span>
-          <span className={`text-3xl font-bold ${isPast ? 'text-slate-400' : 'text-slate-900'}`}>{date}</span>
+          <span className={`text-xs font-bold uppercase tracking-wider ${isPast ? 'text-slate-500 dark:text-slate-400' : 'text-itc-red'}`}>{month}</span>
+          <span className={`text-3xl font-bold ${isPast ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>{date}</span>
         </div>
       )}
       
       <div className="flex-grow space-y-2 py-1">
         {/* Date Row (Only shown if poster exists) */}
         {poster && (
-          <div className={`text-sm font-bold uppercase tracking-wider mb-1 ${isPast ? 'text-slate-500' : 'text-itc-red'}`}>
+          <div className={`text-sm font-bold uppercase tracking-wider mb-1 ${isPast ? 'text-slate-500 dark:text-slate-400' : 'text-itc-red'}`}>
             {month} {date}
           </div>
         )}
 
         <div className="flex flex-wrap items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-              isPast ? 'bg-slate-200 text-slate-600' : 'bg-slate-900 text-white'
+              isPast ? 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
           }`}>
             {type}
           </span>
           {isPast && (
-              <span className="flex items-center gap-1 text-xs font-medium text-slate-500">
+              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                   <CalendarCheck className="w-3 h-3" /> Past Event
               </span>
           )}
           {!isPast && time && (
-               <span className="flex items-center gap-1 text-xs font-medium text-slate-500">
+               <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                   <Clock className="w-3 h-3" /> {time}
               </span>
           )}
@@ -168,14 +168,14 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
         
         <div>
           <h3 className={`text-xl font-bold mb-1 transition-colors ${
-              isPast ? 'text-slate-600' : 'text-slate-900 group-hover:text-itc-green'
+              isPast ? 'text-slate-600 dark:text-slate-400' : 'text-slate-900 dark:text-white group-hover:text-itc-green'
           }`}>
               {title}
           </h3>
-          {subtitle && <p className="text-slate-600 text-sm">{subtitle}</p>}
+          {subtitle && <p className="text-slate-600 dark:text-slate-400 text-sm">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-2 text-slate-500 text-sm">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
           <MapPin className="w-4 h-4" />
           {location}
         </div>
@@ -185,7 +185,7 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
         {hasGallery ? (
           <button 
             onClick={() => onOpenGallery({ title, gallery })}
-            className="w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold bg-slate-900 text-white hover:bg-itc-green transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+            className="w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
           >
             <ImageIcon className="w-4 h-4" />
             View Photos
@@ -197,7 +197,7 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
             rel="noopener noreferrer"
             className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
               isPast 
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed' 
                   : 'bg-itc-green text-white group-hover:bg-itc-red shadow-lg shadow-itc-green/20'
             }`}
             onClick={isPast ? (e) => e.preventDefault() : undefined}
@@ -258,7 +258,7 @@ const Events = () => {
   };
 
   return (
-    <section id="events" className="py-24 bg-white relative">
+    <section id="events" className="py-24 bg-white dark:bg-slate-950 transition-colors duration-300 relative">
       <AnimatePresence>
         {selectedGalleryEvent && (
           <GalleryModal 
@@ -275,7 +275,7 @@ const Events = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
-                className="text-3xl md:text-4xl font-bold text-slate-900 mb-4"
+                className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4"
             >
                 Events
             </motion.h2>
@@ -284,7 +284,7 @@ const Events = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
-                className="text-lg text-slate-600 max-w-2xl"
+                className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl"
             >
               Join our exclusive gatherings in the heart of New York City. 
               Connect with fellow Italian innovators over tech talks, aperitivos, and dinners.
@@ -295,7 +295,7 @@ const Events = () => {
         <div className="space-y-6">
           {/* Upcoming Events */}
           <div className="mb-12">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Upcoming</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-6">Upcoming</h3>
               {upcomingEvents.length > 0 ? (
                 <div className="space-y-6">
                   {upcomingEvents.map((event, index) => {
@@ -312,7 +312,7 @@ const Events = () => {
                           type={event.type}
                           link={event.link}
                           isPast={false}
-                          delay={0.1 + (index * 0.1)}
+                          delay={Math.min(index * 0.1, 0.5)}
                           poster={event.poster}
                           gallery={event.gallery}
                           onOpenGallery={setSelectedGalleryEvent}
@@ -321,16 +321,16 @@ const Events = () => {
                   })}
                 </div>
               ) : (
-                <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200 text-center">
-                    <h4 className="text-xl font-bold text-slate-900 mb-2">No upcoming events at the moment</h4>
-                    <p className="text-slate-600 mb-6">
+                <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
+                    <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No upcoming events at the moment</h4>
+                    <p className="text-slate-600 dark:text-slate-400 mb-6">
                         We are working on the next gathering. Follow us to get notified when new events are announced.
                     </p>
                     <a 
                         href="https://www.gomry.com/form/Italian-Tech-Club-General-application-form-68uJSn7PbLmevuO2T0c5"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 text-white font-bold hover:bg-itc-green transition-colors"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
                     >
                         Join the Club
                     </a>
@@ -341,7 +341,7 @@ const Events = () => {
           {/* Past Events */}
           {pastEvents.length > 0 && (
             <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Past Events</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-6">Past Events</h3>
                 <div className="space-y-6">
                   {pastEvents.map((event, index) => {
                     const { date, month } = formatEventDate(event.date);
@@ -357,7 +357,7 @@ const Events = () => {
                           type={event.type}
                           link={event.link}
                           isPast={true}
-                          delay={0.2 + (index * 0.1)}
+                          delay={Math.min(index * 0.1, 0.5)}
                           poster={event.poster}
                           gallery={event.gallery}
                           onOpenGallery={setSelectedGalleryEvent}

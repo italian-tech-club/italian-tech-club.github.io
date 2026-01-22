@@ -4,12 +4,12 @@ import { ArrowRight } from 'lucide-react';
 
 const NotFound = () => {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center overflow-hidden relative">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center overflow-hidden relative transition-colors duration-300">
       {/* Background Blobs */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/10 rounded-full blur-3xl mix-blend-multiply animate-blob opacity-70" />
-        <div className="absolute top-0 -right-40 w-[35rem] h-[35rem] bg-itc-red/10 rounded-full blur-3xl mix-blend-multiply animate-blob animation-delay-2000 opacity-70" />
-        <div className="absolute -bottom-40 left-20 w-[30rem] h-[30rem] bg-slate-200/50 rounded-full blur-3xl mix-blend-multiply animate-blob animation-delay-4000 opacity-70" />
+        <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/10 dark:bg-itc-green/20 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal animate-blob opacity-70" />
+        <div className="absolute top-0 -right-40 w-[35rem] h-[35rem] bg-itc-red/10 dark:bg-itc-red/20 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal animate-blob animation-delay-2000 opacity-70" />
+        <div className="absolute -bottom-40 left-20 w-[30rem] h-[30rem] bg-slate-200/50 dark:bg-slate-800/50 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-normal animate-blob animation-delay-4000 opacity-70" />
       </div>
 
       {/* Floating Emojis */}
@@ -23,9 +23,9 @@ const NotFound = () => {
       <div className="relative z-10 text-center px-6 max-w-xl">
         {/* Animated 404 */}
         <div className="text-[8rem] md:text-[12rem] font-bold leading-none mb-4">
-          <span className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-itc-green via-slate-900 to-itc-red bg-300% animate-gradient animate-bounce-slow" style={{ animationDelay: '0s' }}>4</span>
-          <span className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-itc-green via-slate-900 to-itc-red bg-300% animate-gradient animate-bounce-slow" style={{ animationDelay: '0.2s' }}>0</span>
-          <span className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-itc-green via-slate-900 to-itc-red bg-300% animate-gradient animate-bounce-slow" style={{ animationDelay: '0.4s' }}>4</span>
+          <span className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-itc-green via-slate-900 to-itc-red dark:via-white bg-300% animate-gradient animate-bounce-slow" style={{ animationDelay: '0s' }}>4</span>
+          <span className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-itc-green via-slate-900 to-itc-red dark:via-white bg-300% animate-gradient animate-bounce-slow" style={{ animationDelay: '0.2s' }}>0</span>
+          <span className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-itc-green via-slate-900 to-itc-red dark:via-white bg-300% animate-gradient animate-bounce-slow" style={{ animationDelay: '0.4s' }}>4</span>
         </div>
 
         {/* Pasta Animation */}
@@ -43,11 +43,11 @@ const NotFound = () => {
           <span className="text-3xl animate-twirl ml-2">🍴</span>
         </div>
 
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-3">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-3">
           Oops! This page is <em>al dente</em>
         </h1>
         
-        <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+        <p className="text-lg text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">
           Looks like this page got lost somewhere between Rome and NYC.<br />
           <span className="italic text-itc-green font-semibold">"Chi cerca, trova!"</span> — Let's get you back on track.
         </p>
@@ -55,14 +55,14 @@ const NotFound = () => {
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <Link
             to="/"
-            className="group px-8 py-4 rounded-full bg-slate-900 text-white font-semibold hover:bg-itc-red transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20 hover:shadow-itc-red/30 hover:-translate-y-1"
+            className="group px-8 py-4 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-red dark:hover:bg-itc-red dark:hover:text-white transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20 hover:shadow-itc-red/30 hover:-translate-y-1"
           >
             Back to Home
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
             to="/#contact"
-            className="px-8 py-4 rounded-full bg-white text-slate-700 font-semibold border border-slate-200 hover:border-itc-green hover:text-itc-green transition-all shadow-sm hover:shadow-md flex items-center justify-center hover:-translate-y-1"
+            className="px-8 py-4 rounded-full bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold border border-slate-200 dark:border-slate-800 hover:border-itc-green dark:hover:border-itc-green hover:text-itc-green dark:hover:text-itc-green transition-all shadow-sm hover:shadow-md flex items-center justify-center hover:-translate-y-1"
           >
             Contact Us
           </Link>

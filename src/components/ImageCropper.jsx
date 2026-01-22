@@ -102,15 +102,15 @@ const ImageCropper = ({ imageFile, onCropComplete, onCancel }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-hidden shadow-2xl transition-colors duration-300">
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900">Crop Your Photo</h3>
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900 dark:text-white">Crop Your Photo</h3>
           <button
             onClick={onCancel}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
           >
-            <X className="w-5 h-5 text-slate-500" />
+            <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
           </button>
         </div>
 
@@ -140,30 +140,30 @@ const ImageCropper = ({ imageFile, onCropComplete, onCancel }) => {
         </div>
 
         {/* Controls */}
-        <div className="p-4 border-t border-slate-100">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setScale(s => Math.max(0.5, s - 0.1))}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 title="Zoom out"
               >
-                <ZoomOut className="w-5 h-5 text-slate-600" />
+                <ZoomOut className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               </button>
-              <span className="text-sm text-slate-500 w-12 text-center">{Math.round(scale * 100)}%</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400 w-12 text-center">{Math.round(scale * 100)}%</span>
               <button
                 onClick={() => setScale(s => Math.min(3, s + 0.1))}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 title="Zoom in"
               >
-                <ZoomIn className="w-5 h-5 text-slate-600" />
+                <ZoomIn className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               </button>
               <button
                 onClick={resetCrop}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors ml-2"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors ml-2"
                 title="Reset"
               >
-                <RotateCcw className="w-5 h-5 text-slate-600" />
+                <RotateCcw className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               </button>
             </div>
             <p className="text-xs text-slate-400">
@@ -174,7 +174,7 @@ const ImageCropper = ({ imageFile, onCropComplete, onCancel }) => {
           <div className="flex gap-3">
             <button
               onClick={onCancel}
-              className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+              className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
               Cancel
             </button>

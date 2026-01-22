@@ -4,7 +4,7 @@ import { Mail, Linkedin, ArrowRight, ExternalLink } from 'lucide-react';
 
 const Contact = () => {
   return (
-    <section id="contact" className="py-24 bg-slate-900 text-white relative overflow-hidden">
+    <section id="contact" className="py-24 bg-slate-900 dark:bg-black text-white relative overflow-hidden transition-colors duration-300">
         {/* Background Accent */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-itc-green/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-itc-red/10 rounded-full blur-3xl" />
@@ -46,12 +46,12 @@ const Contact = () => {
              whileInView={{ opacity: 1, y: 0 }}
              viewport={{ once: true }}
              transition={{ delay: 0.2, duration: 0.6, ease: "easeOut" }}
-             className="bg-gradient-to-br from-white to-slate-100 rounded-3xl p-10 text-slate-900 shadow-2xl relative overflow-hidden group"
+             className="bg-gradient-to-br from-white to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-3xl p-10 text-slate-900 dark:text-white shadow-2xl relative overflow-hidden group transition-colors duration-300"
           >
              <div className="absolute top-0 right-0 w-64 h-64 bg-itc-green/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-itc-green/20 transition-colors duration-500"></div>
 
             <h3 className="text-3xl font-bold mb-4 relative z-10">Join the Club</h3>
-            <p className="text-slate-600 mb-8 relative z-10 leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-300 mb-8 relative z-10 leading-relaxed">
               Apply to become a member of the Italian Tech Club NYC. Access exclusive events, networking opportunities, and our digital community.
             </p>
             
@@ -59,12 +59,12 @@ const Contact = () => {
               href="https://www.gomry.com/form/Italian-Tech-Club-General-application-form-68uJSn7PbLmevuO2T0c5"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-4 rounded-xl bg-slate-900 text-white font-bold hover:bg-itc-red transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl relative z-10 hover:-translate-y-1"
+              className="w-full py-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-red dark:hover:bg-itc-red dark:hover:text-white transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl relative z-10 hover:-translate-y-1"
             >
               Become a Member <ExternalLink className="w-5 h-5" />
             </a>
 
-            <p className="mt-6 text-xs text-slate-500 text-center relative z-10">
+            <p className="mt-6 text-xs text-slate-500 dark:text-slate-400 text-center relative z-10">
               *Applications are reviewed on a rolling basis.
             </p>
           </motion.div>

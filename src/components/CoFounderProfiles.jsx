@@ -18,14 +18,15 @@ import {
   ChevronRight,
   ArrowRight
 } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const ROLE_CONFIG = {
-  technical: { label: 'Technical', emoji: '👨‍💻', color: 'bg-blue-500', lightColor: 'bg-blue-50', textColor: 'text-blue-600' },
-  'non-technical': { label: 'Non-Technical', emoji: '📊', color: 'bg-amber-500', lightColor: 'bg-amber-50', textColor: 'text-amber-600' },
-  design: { label: 'Design', emoji: '🎨', color: 'bg-pink-500', lightColor: 'bg-pink-50', textColor: 'text-pink-600' },
-  hybrid: { label: 'Hybrid', emoji: '🔀', color: 'bg-purple-500', lightColor: 'bg-purple-50', textColor: 'text-purple-600' },
+  technical: { label: 'Technical', emoji: '👨‍💻', color: 'bg-blue-500', lightColor: 'bg-blue-50 dark:bg-blue-900/30', textColor: 'text-blue-600 dark:text-blue-400' },
+  'non-technical': { label: 'Non-Technical', emoji: '📊', color: 'bg-amber-500', lightColor: 'bg-amber-50 dark:bg-amber-900/30', textColor: 'text-amber-600 dark:text-amber-400' },
+  design: { label: 'Design', emoji: '🎨', color: 'bg-pink-500', lightColor: 'bg-pink-50 dark:bg-pink-900/30', textColor: 'text-pink-600 dark:text-pink-400' },
+  hybrid: { label: 'Hybrid', emoji: '🔀', color: 'bg-purple-500', lightColor: 'bg-purple-50 dark:bg-purple-900/30', textColor: 'text-purple-600 dark:text-purple-400' },
 };
 
 const STAGE_CONFIG = {
@@ -73,7 +74,7 @@ const ProfileModal = ({ profile, onClose, onLike, hasLiked }) => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
+        className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl transition-colors duration-300"
       >
         {/* Header with photo */}
         <div className="relative h-64 sm:h-72">
@@ -134,7 +135,7 @@ const ProfileModal = ({ profile, onClose, onLike, hasLiked }) => {
                 {profile.industries.map((industry, idx) => (
                   <span 
                     key={idx}
-                    className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-sm font-medium"
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium"
                   >
                     {industry}
                   </span>
@@ -155,7 +156,7 @@ const ProfileModal = ({ profile, onClose, onLike, hasLiked }) => {
                     <Icon className="w-4 h-4" />
                     {config.label}
                   </div>
-                  <p className="text-slate-700 leading-relaxed pl-6 text-sm sm:text-base">{value}</p>
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed pl-6 text-sm sm:text-base">{value}</p>
                 </div>
               );
             })}
@@ -163,21 +164,21 @@ const ProfileModal = ({ profile, onClose, onLike, hasLiked }) => {
 
           {/* Bio */}
           {profile.bio && (
-            <div className="mt-5 pt-5 border-t border-slate-100">
+            <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">About</h4>
-              <p className="text-slate-600 leading-relaxed text-sm sm:text-base">{profile.bio}</p>
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-sm sm:text-base">{profile.bio}</p>
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             onClick={() => onLike(profile._id)}
             className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-medium transition-all ${
               hasLiked 
                 ? 'bg-pink-500 text-white' 
-                : 'bg-white border border-slate-200 text-slate-700 hover:border-pink-300 hover:text-pink-500'
+                : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-pink-300 dark:hover:border-pink-700 hover:text-pink-500 dark:hover:text-pink-400'
             }`}
           >
             <ThumbsUp className={`w-5 h-5 ${hasLiked ? 'fill-current' : ''}`} />
@@ -187,7 +188,7 @@ const ProfileModal = ({ profile, onClose, onLike, hasLiked }) => {
             href={profile.linkedIn}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900 text-white font-medium hover:bg-itc-green transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
           >
             <Linkedin className="w-5 h-5" />
             Connect on LinkedIn
@@ -217,7 +218,7 @@ const ProfileCard = ({ profile, onClick, index = 0 }) => {
       }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       onClick={onClick}
-      className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-xl transition-shadow duration-300 group"
+      className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 group"
     >
       {/* Photo */}
       <div className="relative aspect-[4/5] overflow-hidden">
@@ -257,14 +258,14 @@ const ProfileCard = ({ profile, onClick, index = 0 }) => {
             <p className="text-xs text-slate-400 font-medium mb-1">
               {PROMPT_CONFIG[firstPrompt[0]]?.label}
             </p>
-            <p className="text-xs sm:text-sm text-slate-700 line-clamp-2">{firstPrompt[1]}</p>
+            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{firstPrompt[1]}</p>
           </div>
         )}
         
         <div className="flex items-center justify-between">
           {profile.industries?.length > 0 ? (
-            <div className="flex items-center gap-1 text-xs text-slate-500 overflow-hidden">
-              <span className="px-2 py-0.5 bg-slate-100 rounded-full truncate max-w-[100px]">{profile.industries[0]}</span>
+            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 overflow-hidden">
+              <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full truncate max-w-[100px]">{profile.industries[0]}</span>
               {profile.industries.length > 1 && (
                 <span className="text-slate-400 flex-shrink-0">+{profile.industries.length - 1}</span>
               )}
@@ -376,12 +377,16 @@ const CoFounderProfiles = () => {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors duration-300">
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
+
       {/* Background Effects */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/8 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -right-40 w-[40rem] h-[40rem] bg-itc-red/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] bg-amber-100/50 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/8 dark:bg-itc-green/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -right-40 w-[40rem] h-[40rem] bg-itc-red/8 dark:bg-itc-red/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] bg-amber-100/50 dark:bg-amber-900/20 rounded-full blur-3xl" />
       </div>
 
       {/* Profile Modal */}
@@ -403,17 +408,17 @@ const CoFounderProfiles = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8 sm:mb-12"
         >
-          <div className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-white text-slate-600 text-sm font-medium mb-6 border border-slate-200 shadow-sm">
+          <div className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-sm font-medium mb-6 border border-slate-200 dark:border-slate-800 shadow-sm">
             <Users className="w-4 h-4 text-itc-green" />
             {profiles.length} Potential Co-founders
           </div>
           
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
             Find Your 
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-itc-green to-itc-red"> Match</span>
           </h1>
           
-          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto px-4">
+          <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto px-4">
             Browse profiles from the Italian Tech Club community and find your perfect co-founder match.
           </p>
         </motion.div>
@@ -423,7 +428,7 @@ const CoFounderProfiles = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-8"
+          className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 mb-8"
         >
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -433,14 +438,14 @@ const CoFounderProfiles = () => {
                 placeholder="Search by name or industry..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none"
+                className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none"
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setFilter('all')}
                 className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                  filter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  filter === 'all' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 All ({profiles.length})
@@ -453,7 +458,7 @@ const CoFounderProfiles = () => {
                     key={key}
                     onClick={() => setFilter(key)}
                     className={`px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                      filter === key ? `${config.color} text-white` : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      filter === key ? `${config.color} text-white` : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
                     {config.emoji}
@@ -470,7 +475,7 @@ const CoFounderProfiles = () => {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-10 h-10 text-itc-green animate-spin mb-4" />
-            <p className="text-slate-500">Loading profiles...</p>
+            <p className="text-slate-500 dark:text-slate-400">Loading profiles...</p>
           </div>
         )}
 
@@ -478,8 +483,8 @@ const CoFounderProfiles = () => {
         {error && !loading && (
           <div className="text-center py-20">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-slate-600 mb-4">{error}</p>
-            <button onClick={fetchProfiles} className="px-6 py-2 rounded-full bg-slate-900 text-white font-medium hover:bg-itc-green transition-colors">
+            <p className="text-slate-600 dark:text-slate-400 mb-4">{error}</p>
+            <button onClick={fetchProfiles} className="px-6 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors">
               Try Again
             </button>
           </div>
@@ -489,9 +494,9 @@ const CoFounderProfiles = () => {
         {!loading && !error && profiles.length === 0 && (
           <div className="text-center py-20">
             <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-900 mb-2">No profiles yet</h3>
-            <p className="text-slate-500 mb-6">Be the first to create a profile!</p>
-            <a href="/cofounder-matching" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 text-white font-medium hover:bg-itc-green transition-colors">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No profiles yet</h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">Be the first to create a profile!</p>
+            <a href="/cofounder-matching" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors">
               Create Your Profile <ArrowRight className="w-4 h-4" />
             </a>
           </div>
@@ -501,8 +506,8 @@ const CoFounderProfiles = () => {
         {!loading && !error && profiles.length > 0 && filteredProfiles.length === 0 && (
           <div className="text-center py-20">
             <Search className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-900 mb-2">No matches found</h3>
-            <p className="text-slate-500">Try adjusting your search or filters</p>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No matches found</h3>
+            <p className="text-slate-500 dark:text-slate-400">Try adjusting your search or filters</p>
           </div>
         )}
 
@@ -530,14 +535,14 @@ const CoFounderProfiles = () => {
             transition={{ delay: 0.5 }}
             className="mt-12 sm:mt-16 text-center"
           >
-            <div className="bg-gradient-to-r from-itc-green/10 via-white to-itc-red/10 rounded-3xl p-6 sm:p-10 border border-slate-100">
-              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3">Don't see yourself here?</h3>
-              <p className="text-slate-600 mb-6 max-w-md mx-auto text-sm sm:text-base">
+            <div className="bg-gradient-to-r from-itc-green/10 via-white to-itc-red/10 dark:via-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-100 dark:border-slate-800">
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">Don't see yourself here?</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto text-sm sm:text-base">
                 Create your profile and let others in the Italian Tech Club community find you!
               </p>
               <a 
                 href="/cofounder-matching"
-                className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-slate-900 text-white font-semibold hover:bg-itc-green transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
               >
                 Create Your Profile
                 <Rocket className="w-5 h-5" />

@@ -28,7 +28,7 @@ const HomePage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 selection:bg-itc-green selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 selection:bg-itc-green selection:text-white transition-colors duration-300">
       <Navbar />
       <main>
         <Hero />

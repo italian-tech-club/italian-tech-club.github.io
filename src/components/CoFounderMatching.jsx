@@ -15,6 +15,7 @@ import {
   Crop
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
+import ThemeToggle from './ThemeToggle';
 
 const PROFILE_PIC_SIZE = 400; // Required dimensions in pixels
 const MAX_FILE_SIZE_MB = 5;
@@ -271,22 +272,22 @@ const CoFounderMatching = () => {
 
   if (submitSuccess) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center px-4 transition-colors duration-300">
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full bg-white rounded-3xl p-10 shadow-xl text-center"
+          className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-10 shadow-xl text-center"
         >
-          <div className="w-20 h-20 bg-itc-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 bg-itc-green/10 dark:bg-itc-green/20 rounded-full flex items-center justify-center mx-auto mb-6">
             <Check className="w-10 h-10 text-itc-green" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">You're In! 🎉</h2>
-          <p className="text-slate-600 mb-8">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">You're In! 🎉</h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-8">
             Thanks for submitting your profile! We'll review your application and match you with potential co-founders from the Italian Tech Club community.
           </p>
           <a 
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 text-white font-semibold hover:bg-itc-green transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
           >
             Back to Homepage
           </a>
@@ -296,7 +297,11 @@ const CoFounderMatching = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors duration-300">
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
+
       {/* Image Cropper Modal */}
       {showCropper && selectedFile && (
         <ImageCropper
@@ -308,9 +313,9 @@ const CoFounderMatching = () => {
 
       {/* Background Effects */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/8 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -right-40 w-[40rem] h-[40rem] bg-itc-red/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] bg-amber-100/50 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/8 dark:bg-itc-green/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -right-40 w-[40rem] h-[40rem] bg-itc-red/8 dark:bg-itc-red/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] bg-amber-100/50 dark:bg-amber-900/20 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-12 sm:py-20">
@@ -321,7 +326,7 @@ const CoFounderMatching = () => {
           animate="show"
           className="text-center mb-12"
         >
-          <motion.div variants={item} className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-white text-slate-600 text-sm font-medium mb-6 border border-slate-200 shadow-sm">
+          <motion.div variants={item} className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-sm font-medium mb-6 border border-slate-200 dark:border-slate-800 shadow-sm">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-itc-red opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-itc-red"></span>
@@ -329,12 +334,12 @@ const CoFounderMatching = () => {
             Italian Tech Club NYC
           </motion.div>
           
-          <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">
+          <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
             Find Your 
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-itc-green to-itc-red"> Co-Founder</span>
           </motion.h1>
           
-          <motion.p variants={item} className="text-lg text-slate-600 max-w-xl mx-auto">
+          <motion.p variants={item} className="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
             The best startups are built by great teams. Tell us about yourself, and we'll help you find your perfect match from the Italian Tech community.
           </motion.p>
         </motion.div>
@@ -348,12 +353,12 @@ const CoFounderMatching = () => {
           className="space-y-8"
         >
           {/* Profile Picture Section */}
-          <motion.div variants={item} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+          <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-itc-green" />
               Profile Picture
             </h2>
-            <p className="text-slate-500 text-sm mb-6">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
               Upload a clear photo of yourself. Minimum {PROFILE_PIC_SIZE}x{PROFILE_PIC_SIZE}px, max {MAX_FILE_SIZE_MB}MB.
             </p>
             
@@ -374,9 +379,9 @@ const CoFounderMatching = () => {
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer hover:border-itc-green hover:bg-itc-green/5 transition-all">
+                <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:border-itc-green dark:hover:border-itc-green hover:bg-itc-green/5 dark:hover:bg-itc-green/10 transition-all">
                   <Upload className="w-10 h-10 text-slate-400 mb-3" />
-                  <span className="text-slate-600 font-medium">Click to upload</span>
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">Click to upload</span>
                   <span className="text-slate-400 text-sm mt-1">PNG, JPG up to {MAX_FILE_SIZE_MB}MB</span>
                   <input 
                     ref={fileInputRef}
@@ -396,34 +401,34 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Basic Info Section */}
-          <motion.div variants={item} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+          <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
               <User className="w-5 h-5 text-itc-green" />
               About You
             </h2>
             
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div className={errors.firstName ? 'error-field' : ''}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">First Name *</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">First Name *</label>
                 <input
                   type="text"
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 ${errors.firstName ? 'border-red-300 bg-red-50' : 'border-slate-200'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
+                  className={`w-full px-4 py-3 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 ${errors.firstName ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
                   placeholder="Mario"
                 />
                 {errors.firstName && <p className="mt-1 text-sm text-red-500">{errors.firstName}</p>}
               </div>
               
               <div className={errors.lastName ? 'error-field' : ''}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Last Name *</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Last Name *</label>
                 <input
                   type="text"
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 ${errors.lastName ? 'border-red-300 bg-red-50' : 'border-slate-200'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
+                  className={`w-full px-4 py-3 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 ${errors.lastName ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
                   placeholder="Rossi"
                 />
                 {errors.lastName && <p className="mt-1 text-sm text-red-500">{errors.lastName}</p>}
@@ -431,26 +436,26 @@ const CoFounderMatching = () => {
             </div>
 
             <div className={`mb-4 ${errors.email ? 'error-field' : ''}`}>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Email *</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email *</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 ${errors.email ? 'border-red-300 bg-red-50' : 'border-slate-200'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
+                className={`w-full px-4 py-3 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 ${errors.email ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
                 placeholder="mario@example.com"
               />
               {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
             </div>
 
             <div className={errors.linkedIn ? 'error-field' : ''}>
-              <label className="block text-sm font-medium text-slate-700 mb-2">LinkedIn Profile *</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">LinkedIn Profile *</label>
               <input
                 type="url"
                 name="linkedIn"
                 value={formData.linkedIn}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 rounded-xl border bg-white text-slate-900 placeholder:text-slate-400 ${errors.linkedIn ? 'border-red-300 bg-red-50' : 'border-slate-200'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
+                className={`w-full px-4 py-3 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 ${errors.linkedIn ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700'} focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`}
                 placeholder="https://linkedin.com/in/yourprofile"
               />
               {errors.linkedIn && <p className="mt-1 text-sm text-red-500">{errors.linkedIn}</p>}
@@ -458,12 +463,12 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Role Selection */}
-          <motion.div variants={item} className={`bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 ${errors.role ? 'error-field' : ''}`}>
-            <h2 className="text-xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+          <motion.div variants={item} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800 ${errors.role ? 'error-field' : ''}`}>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-itc-green" />
               What's Your Role? *
             </h2>
-            <p className="text-slate-500 text-sm mb-6">Select the role that best describes your skill set</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Select the role that best describes your skill set</p>
             
             <div className="grid sm:grid-cols-2 gap-3">
               {ROLE_OPTIONS.map(option => (
@@ -473,13 +478,13 @@ const CoFounderMatching = () => {
                   onClick={() => handleRoleSelect(option.value)}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                     formData.role === option.value 
-                      ? 'border-itc-green bg-itc-green/5' 
-                      : 'border-slate-200 hover:border-slate-300'
+                      ? 'border-itc-green bg-itc-green/5 dark:bg-itc-green/10' 
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   <span className="text-2xl mb-2 block">{option.emoji}</span>
-                  <span className="font-semibold text-slate-900 block">{option.label}</span>
-                  <span className="text-sm text-slate-500">{option.description}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white block">{option.label}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">{option.description}</span>
                 </button>
               ))}
             </div>
@@ -487,12 +492,12 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Stage Selection */}
-          <motion.div variants={item} className={`bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 ${errors.stage ? 'error-field' : ''}`}>
-            <h2 className="text-xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+          <motion.div variants={item} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800 ${errors.stage ? 'error-field' : ''}`}>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <Lightbulb className="w-5 h-5 text-itc-green" />
               Where Are You At? *
             </h2>
-            <p className="text-slate-500 text-sm mb-6">What's your current entrepreneurial stage?</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">What's your current entrepreneurial stage?</p>
             
             <div className="grid sm:grid-cols-2 gap-3">
               {STAGE_OPTIONS.map(option => (
@@ -502,13 +507,13 @@ const CoFounderMatching = () => {
                   onClick={() => handleStageSelect(option.value)}
                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                     formData.stage === option.value 
-                      ? 'border-itc-green bg-itc-green/5' 
-                      : 'border-slate-200 hover:border-slate-300'
+                      ? 'border-itc-green bg-itc-green/5 dark:bg-itc-green/10' 
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   <span className="text-2xl mb-2 block">{option.emoji}</span>
-                  <span className="font-semibold text-slate-900 block">{option.label}</span>
-                  <span className="text-sm text-slate-500">{option.description}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white block">{option.label}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">{option.description}</span>
                 </button>
               ))}
             </div>
@@ -516,9 +521,9 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Commitment Level */}
-          <motion.div variants={item} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Your Availability</h2>
-            <p className="text-slate-500 text-sm mb-6">How much time can you commit?</p>
+          <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Your Availability</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">How much time can you commit?</p>
             
             <div className="flex flex-wrap gap-3">
               {COMMITMENT_OPTIONS.map(option => (
@@ -529,7 +534,7 @@ const CoFounderMatching = () => {
                   className={`px-5 py-3 rounded-full border-2 font-medium transition-all ${
                     formData.commitment === option.value 
                       ? 'border-itc-green bg-itc-green text-white' 
-                      : 'border-slate-200 text-slate-700 hover:border-slate-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   {option.emoji} {option.label}
@@ -539,9 +544,9 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Industries */}
-          <motion.div variants={item} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Industries of Interest</h2>
-            <p className="text-slate-500 text-sm mb-6">Select all that excite you</p>
+          <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Industries of Interest</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Select all that excite you</p>
             
             <div className="flex flex-wrap gap-2">
               {INDUSTRIES.map(industry => (
@@ -551,8 +556,8 @@ const CoFounderMatching = () => {
                   onClick={() => handleIndustryToggle(industry)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     formData.industries.includes(industry)
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
                   {industry}
@@ -562,12 +567,12 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Hinge-Style Prompts */}
-          <motion.div variants={item} className={`bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 ${errors.prompts ? 'error-field' : ''}`}>
-            <h2 className="text-xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+          <motion.div variants={item} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800 ${errors.prompts ? 'error-field' : ''}`}>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-itc-green" />
               Tell Us More
             </h2>
-            <p className="text-slate-500 text-sm mb-6">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
               Answer at least 3 prompts to help us find your perfect match
             </p>
             
@@ -576,7 +581,7 @@ const CoFounderMatching = () => {
                 const Icon = prompt.icon;
                 return (
                   <div key={prompt.id}>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">
                       <Icon className="w-4 h-4 text-itc-green" />
                       {prompt.label}
                     </label>
@@ -586,7 +591,7 @@ const CoFounderMatching = () => {
                       placeholder={prompt.placeholder}
                       rows={3}
                       maxLength={300}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all resize-none"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all resize-none"
                     />
                     <p className="text-xs text-slate-400 text-right mt-1">
                       {formData.prompts[prompt.id].length}/300
@@ -603,9 +608,9 @@ const CoFounderMatching = () => {
           </motion.div>
 
           {/* Short Bio */}
-          <motion.div variants={item} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Anything Else?</h2>
-            <p className="text-slate-500 text-sm mb-6">
+          <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Anything Else?</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
               Share anything else you'd like potential co-founders to know
             </p>
             
@@ -616,7 +621,7 @@ const CoFounderMatching = () => {
               placeholder="Your background, achievements, what makes you unique, or anything else..."
               rows={4}
               maxLength={500}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all resize-none"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all resize-none"
             />
             <p className="text-xs text-slate-400 text-right mt-1">
               {formData.bio.length}/500
@@ -628,7 +633,7 @@ const CoFounderMatching = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-4 rounded-2xl bg-slate-900 text-white font-bold text-lg hover:bg-itc-green transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-lg hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
@@ -644,13 +649,13 @@ const CoFounderMatching = () => {
             </button>
 
             {submitError && (
-              <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
+              <div className="mt-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <span>{submitError}</span>
               </div>
             )}
             
-            <p className="text-center text-sm text-slate-500 mt-4">
+            <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-4">
               By submitting, you agree to be contacted by Italian Tech Club NYC for co-founder matching purposes.
             </p>
           </motion.div>
