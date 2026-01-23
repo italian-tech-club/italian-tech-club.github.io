@@ -11,6 +11,17 @@
     "gallery": []
   },
   {
+    "date": "2026-01-22",
+    "title": "January Dinner",
+    "subtitle": "First Italian Tech Club gathering in New York",
+    "location": "Kesté, 77 Fulton St, New York, NY 10038",
+    "time": null,
+    "type": "Members' Dinner",
+    "link": null,
+    "poster": null,
+    "gallery": ["/images/events/jan-dinner-2026/img1.jpg", "/images/events/jan-dinner-2026/img2.jpg", "/images/events/jan-dinner-2026/img3.jpg", "/images/events/jan-dinner-2026/img4.jpg"]
+  },
+  {
     "date": "2025-12-02",
     "title": "Tech Talk & Networking",
     "subtitle": "Interview with Gianluca Galletto (I³/NYC Chairman)",
