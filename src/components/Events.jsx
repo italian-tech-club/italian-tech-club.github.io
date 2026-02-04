@@ -116,29 +116,34 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-itc-green/30 dark:hover:border-itc-green/30'
       }`}
     >
-      {/* Poster */}
-      {poster && (
-        <div 
-          onClick={() => hasGallery && onOpenGallery({ title, gallery })}
-          className={`flex-shrink-0 w-32 h-auto rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 ${hasGallery ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
-        >
-          <img 
-            src={poster} 
-            alt={`${title} poster`} 
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
-
-      {/* Date Box (Only shown if no poster) */}
-      {!poster && (
-        <div className={`flex-shrink-0 w-20 h-20 rounded-xl flex flex-col items-center justify-center border ${
-          isPast ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-inner'
-        }`}>
-          <span className={`text-xs font-bold uppercase tracking-wider ${isPast ? 'text-slate-500 dark:text-slate-400' : 'text-itc-red'}`}>{month}</span>
-          <span className={`text-3xl font-bold ${isPast ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>{date}</span>
-        </div>
-      )}
+      {/* Media column (fixed size so poster & calendar match) */}
+      <div className="flex-shrink-0 w-32 aspect-square">
+        {poster ? (
+          <div 
+            onClick={() => hasGallery && onOpenGallery({ title, gallery })}
+            className={`w-full h-full rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 ${hasGallery ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+          >
+            <img 
+              src={poster} 
+              alt={`${title} poster`} 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className={`w-full h-full rounded-xl relative flex flex-col items-center justify-center border ${
+            isPast ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 shadow-inner'
+          }`}>
+            <span
+              className={`absolute top-4 text-base font-extrabold uppercase tracking-widest ${
+                isPast ? 'text-slate-500 dark:text-slate-400' : 'text-itc-red'
+              }`}
+            >
+              {month}
+            </span>
+            <span className={`text-5xl font-bold leading-none mt-4 ${isPast ? 'text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>{date}</span>
+          </div>
+        )}
+      </div>
       
       <div className="flex-grow space-y-2 py-1">
         {/* Date Row (Only shown if poster exists) */}
