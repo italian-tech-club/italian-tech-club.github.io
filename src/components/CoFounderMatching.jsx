@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { 
   Upload, 
   User, 
@@ -12,7 +13,8 @@ import {
   AlertCircle,
   X,
   Image as ImageIcon,
-  Crop
+  Crop,
+  Home
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
@@ -298,8 +300,15 @@ const CoFounderMatching = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors duration-300">
-      <div className="absolute top-6 right-6 z-20">
-        <ThemeToggle />
+      {/* Top Controls */}
+      <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-20">
+        <Link 
+          to="/" 
+          className="p-3 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-itc-green dark:hover:text-itc-green transition-all shadow-sm hover:shadow-md"
+        >
+          <Home className="w-5 h-5" />
+        </Link>
+        <ThemeToggle className="shadow-sm hover:shadow-md" />
       </div>
 
       {/* Image Cropper Modal */}
@@ -318,7 +327,7 @@ const CoFounderMatching = () => {
         <div className="absolute -bottom-40 left-1/4 w-[40rem] h-[40rem] bg-amber-100/50 dark:bg-amber-900/20 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 max-w-3xl mx-auto px-4 py-12 sm:py-20">
+      <div className="relative z-10 max-w-3xl mx-auto px-4 pt-20 pb-12 sm:py-20">
         {/* Header */}
         <motion.div 
           variants={container}

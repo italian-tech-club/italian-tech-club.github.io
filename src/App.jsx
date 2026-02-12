@@ -13,6 +13,7 @@ import CoFounderProfiles from './components/CoFounderProfiles';
 import NotFound from './components/NotFound';
 import WhatsAppRedirect from './components/WhatsAppRedirect';
 import WhatsAppQR from './components/WhatsAppQR';
+import MatchingQR from './components/MatchingQR';
 
 // Homepage component with all sections
 const HomePage = () => {
@@ -60,6 +61,7 @@ function App() {
       <Route path="/cofounders" element={<CoFounderProfiles />} />
       <Route path="/whatsapp" element={<WhatsAppRedirect />} />
       <Route path="/qr" element={<WhatsAppQR />} />
+      <Route path="/matching-qr" element={<MatchingQR />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
