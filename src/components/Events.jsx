@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, ArrowRight, CalendarCheck, Clock, Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, ArrowRight, CalendarCheck, Clock, Image as ImageIcon, X, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import eventsData from '../data/events.json';
 
 const GalleryModal = ({ event, onClose }) => {
@@ -195,6 +195,11 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
             <ImageIcon className="w-4 h-4" />
             View Photos
           </button>
+        ) : !isPast && !link ? (
+          <span className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            {type && /members?/i.test(type) ? 'Members event' : 'Private event'}
+          </span>
         ) : (
           <a
             href={link}
