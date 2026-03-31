@@ -6,7 +6,8 @@
     "location": "San Marzano, 117 2nd Ave, New York, NY 10003",
     "time": "12:00 PM",
     "type": "Members' Brunch",
-    "poster": "/images/events/brunch-mar-2026/poster.png"
+    "poster": "/images/events/brunch-mar-2026/poster.png",
+    "gallery": ["/images/events/brunch-mar-2026/img1.jpg", "/images/events/brunch-mar-2026/img2.jpg", "/images/events/brunch-mar-2026/img3.jpg"]
   },
   {
     "date": "2026-02-26",
