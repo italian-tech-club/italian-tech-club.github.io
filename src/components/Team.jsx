@@ -5,7 +5,6 @@ import { Linkedin, ArrowUpRight } from 'lucide-react';
 const teamMembers = [
   { name: 'Giuseppe Concialdi', linkedin: 'https://www.linkedin.com/in/giuseppe-concialdi/' },
   { name: 'Enrico Fontana', linkedin: 'https://www.linkedin.com/in/enrico-fontana/' },
-  { name: 'Giuseppe Di Cera', linkedin: 'https://www.linkedin.com/in/giuseppe-di-cera-0144ab1a7/' },
   { name: 'Nicole Bizzini', linkedin: 'https://www.linkedin.com/in/nicolebizzini/' },
   { name: 'Noemi Gozzi', linkedin: 'https://www.linkedin.com/in/noemi-gozzi-a87a2215a/' },
   { name: 'Michela Tarantino', linkedin: 'https://www.linkedin.com/in/michela-tarantino/' },
