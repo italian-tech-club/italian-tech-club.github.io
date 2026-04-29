@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-04-30",
+    "title": "Meet & Eat @ Pasta Eater",
+    "subtitle": "Drinks + bites with the Italian Tech Club community at Pasta Eater",
+    "location": "Pasta Eater, 9 East 17th Street, New York, NY 10003",
+    "time": "6:30 PM - 8:30 PM",
+    "type": "Networking",
+    "poster": "/images/events/meet-eat-apr-2026/poster.png",
+    "gallery": []
+  },
+  {
     "date": "2026-03-28",
     "title": "ITC Spring Brunch",
     "subtitle": "Brunch with Italian Tech Club members",
@@ -34,7 +44,7 @@
   {
     "date": "2026-01-22",
     "title": "January Dinner",
-    "subtitle": "First Italian Tech Club gathering in New York",
+    "subtitle": "First monthly community gathering, reserved for members only",
     "location": "Kesté, 77 Fulton St, New York, NY 10038",
     "time": null,
     "type": "Members' Dinner",

@@ -1,7 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, ArrowRight, CalendarCheck, Clock, Image as ImageIcon, X, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import eventsData from '../data/events.json';
+
+const HOMEPAGE_EVENTS_LIMIT = 4;
 
 const GalleryModal = ({ event, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -221,7 +224,7 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
   );
 };
 
-const Events = () => {
+const Events = ({ showAll = false }) => {
   const [selectedGalleryEvent, setSelectedGalleryEvent] = useState(null);
 
   // Helper function to parse date string as local date (not UTC)
@@ -257,6 +260,14 @@ const Events = () => {
 
     return { upcomingEvents: upcoming, pastEvents: past };
   }, []);
+
+  const totalEvents = upcomingEvents.length + pastEvents.length;
+  const displayedUpcoming = showAll
+    ? upcomingEvents
+    : upcomingEvents.slice(0, HOMEPAGE_EVENTS_LIMIT);
+  const remainingSlots = Math.max(HOMEPAGE_EVENTS_LIMIT - displayedUpcoming.length, 0);
+  const displayedPast = showAll ? pastEvents : pastEvents.slice(0, remainingSlots);
+  const showViewAllCTA = !showAll && totalEvents > HOMEPAGE_EVENTS_LIMIT;
 
   // Helper function to format date for display
   const formatEventDate = (dateString) => {
@@ -306,9 +317,9 @@ const Events = () => {
           {/* Upcoming Events */}
           <div className="mb-12">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-6">Upcoming</h3>
-              {upcomingEvents.length > 0 ? (
+              {displayedUpcoming.length > 0 ? (
                 <div className="space-y-6">
-                  {upcomingEvents.map((event, index) => {
+                  {displayedUpcoming.map((event, index) => {
                     const { date, month } = formatEventDate(event.date);
                     return (
                       <EventCard 
@@ -349,11 +360,11 @@ const Events = () => {
           </div>
 
           {/* Past Events */}
-          {pastEvents.length > 0 && (
+          {displayedPast.length > 0 && (
             <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-6">Past Events</h3>
                 <div className="space-y-6">
-                  {pastEvents.map((event, index) => {
+                  {displayedPast.map((event, index) => {
                     const { date, month } = formatEventDate(event.date);
                     return (
                       <EventCard 
@@ -375,6 +386,18 @@ const Events = () => {
                     );
                   })}
                 </div>
+            </div>
+          )}
+
+          {showViewAllCTA && (
+            <div className="flex justify-center pt-6">
+              <Link
+                to="/events"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
+              >
+                View all events
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           )}
         </div>
