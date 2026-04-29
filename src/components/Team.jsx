@@ -42,7 +42,7 @@ const TeamCard = ({ name, linkedin }) => {
             target="_blank"
             rel="noopener noreferrer"
             variants={itemVariants}
-            className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-itc-green/50 dark:hover:border-itc-green/50 hover:shadow-lg transition-all duration-300 flex items-center gap-4"
+            className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-itc-green/50 dark:hover:border-itc-green/50 hover:shadow-lg transition-all duration-300 flex items-center gap-4 w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]"
         >
             <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-900 dark:text-white font-bold text-lg group-hover:bg-itc-green group-hover:text-white transition-colors duration-300">
                 {initials}
@@ -89,7 +89,7 @@ const Team = () => {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-50px" }}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="flex flex-wrap justify-center gap-6"
         >
           {teamMembers.map((member) => (
             <TeamCard key={member.name} {...member} />
