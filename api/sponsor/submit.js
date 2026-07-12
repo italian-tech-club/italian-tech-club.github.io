@@ -26,7 +26,7 @@ const sponsorInquirySchema = new mongoose.Schema({
   contactName: { type: String, required: true, trim: true, maxlength: 100 },
   email: { type: String, required: true, lowercase: true, trim: true },
   website: { type: String, trim: true, default: '' },
-  sponsorshipType: { type: String, enum: ['event', 'venue', 'food-drinks', 'prizes', 'recurring', 'other'], default: 'event' },
+  sponsorshipTypes: [{ type: String, enum: ['event', 'venue', 'food-drinks', 'prizes', 'recurring', 'other'] }],
   message: { type: String, required: true, maxlength: 2000 },
   status: { type: String, enum: ['new', 'contacted', 'closed'], default: 'new' },
 }, {
@@ -67,7 +67,7 @@ async function sendNotificationEmail(inquiry) {
     <p><strong>Contact:</strong> ${escapeHtml(inquiry.contactName)}</p>
     <p><strong>Email:</strong> ${escapeHtml(inquiry.email)}</p>
     ${inquiry.website ? `<p><strong>Website:</strong> ${escapeHtml(inquiry.website)}</p>` : ''}
-    <p><strong>Interested in:</strong> ${TYPE_LABELS[inquiry.sponsorshipType] || inquiry.sponsorshipType}</p>
+    <p><strong>Interested in:</strong> ${(inquiry.sponsorshipTypes || []).map(t => TYPE_LABELS[t] || t).join(', ') || '—'}</p>
     <p><strong>Message:</strong></p>
     <p style="white-space: pre-wrap;">${escapeHtml(inquiry.message)}</p>
     <hr />
@@ -116,7 +116,7 @@ export default async function handler(req, res) {
   try {
     await connectDB();
 
-    const { companyName, contactName, email, website, sponsorshipType, message } = req.body;
+    const { companyName, contactName, email, website, sponsorshipTypes, sponsorshipType, message } = req.body;
 
     if (!companyName || !contactName || !email || !message) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -131,7 +131,10 @@ export default async function handler(req, res) {
       contactName: contactName.trim(),
       email: email.toLowerCase().trim(),
       website: website?.trim() || '',
-      sponsorshipType: sponsorshipType || 'event',
+      // Accept the legacy single value from clients on the old bundle
+      sponsorshipTypes: Array.isArray(sponsorshipTypes)
+        ? sponsorshipTypes
+        : (sponsorshipType ? [sponsorshipType] : ['event']),
       message: message.trim(),
     });
 

@@ -25,11 +25,10 @@ const sponsorInquirySchema = new mongoose.Schema({
     trim: true,
     default: '',
   },
-  sponsorshipType: {
+  sponsorshipTypes: [{
     type: String,
     enum: ['event', 'venue', 'food-drinks', 'prizes', 'recurring', 'other'],
-    default: 'event',
-  },
+  }],
   message: {
     type: String,
     required: [true, 'Message is required'],

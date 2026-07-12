@@ -39,7 +39,7 @@ const SponsorPage = () => {
     contactName: '',
     email: '',
     website: '',
-    sponsorshipType: 'event',
+    sponsorshipTypes: ['event'],
     message: '',
   });
   const [errors, setErrors] = useState({});
@@ -245,17 +245,23 @@ const SponsorPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">How would you like to collaborate?</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">How would you like to collaborate? <span className="font-normal text-slate-400">(select all that apply)</span></label>
                 <div className="flex flex-wrap gap-2">
                   {SPONSORSHIP_OPTIONS.map((option) => {
                     const Icon = option.icon;
+                    const selected = formData.sponsorshipTypes.includes(option.value);
                     return (
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, sponsorshipType: option.value }))}
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          sponsorshipTypes: selected
+                            ? prev.sponsorshipTypes.filter(v => v !== option.value)
+                            : [...prev.sponsorshipTypes, option.value],
+                        }))}
                         className={`px-3.5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
-                          formData.sponsorshipType === option.value
+                          selected
                             ? 'bg-itc-green text-white'
                             : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-itc-green/50'
                         }`}

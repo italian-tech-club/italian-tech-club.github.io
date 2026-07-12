@@ -33,7 +33,7 @@ async function sendNotificationEmail(inquiry) {
     <p><strong>Contact:</strong> ${escapeHtml(inquiry.contactName)}</p>
     <p><strong>Email:</strong> ${escapeHtml(inquiry.email)}</p>
     ${inquiry.website ? `<p><strong>Website:</strong> ${escapeHtml(inquiry.website)}</p>` : ''}
-    <p><strong>Interested in:</strong> ${TYPE_LABELS[inquiry.sponsorshipType] || inquiry.sponsorshipType}</p>
+    <p><strong>Interested in:</strong> ${(inquiry.sponsorshipTypes || []).map(t => TYPE_LABELS[t] || t).join(', ') || '—'}</p>
     <p><strong>Message:</strong></p>
     <p style="white-space: pre-wrap;">${escapeHtml(inquiry.message)}</p>
     <hr />
@@ -70,7 +70,7 @@ async function sendNotificationEmail(inquiry) {
  */
 router.post('/submit', async (req, res) => {
   try {
-    const { companyName, contactName, email, website, sponsorshipType, message } = req.body;
+    const { companyName, contactName, email, website, sponsorshipTypes, sponsorshipType, message } = req.body;
 
     if (!companyName || !contactName || !email || !message) {
       return res.status(400).json({
@@ -84,7 +84,10 @@ router.post('/submit', async (req, res) => {
       contactName: contactName.trim(),
       email: email.toLowerCase().trim(),
       website: website?.trim() || '',
-      sponsorshipType: sponsorshipType || 'event',
+      // Accept the legacy single value from clients on the old bundle
+      sponsorshipTypes: Array.isArray(sponsorshipTypes)
+        ? sponsorshipTypes
+        : (sponsorshipType ? [sponsorshipType] : ['event']),
       message: message.trim(),
     });
 
