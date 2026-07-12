@@ -15,6 +15,8 @@ import WhatsAppRedirect from './components/WhatsAppRedirect';
 import WhatsAppQR from './components/WhatsAppQR';
 import MatchingQR from './components/MatchingQR';
 import AllEvents from './components/AllEvents';
+import Sponsor from './components/Sponsor';
+import SponsorPage from './components/SponsorPage';
 
 // Homepage component with all sections
 const HomePage = () => {
@@ -40,6 +42,7 @@ const HomePage = () => {
         <Activities />
         <Events />
         <Team />
+        <Sponsor />
         <Contact />
       </main>
       <Footer />
@@ -64,6 +67,7 @@ function App() {
       <Route path="/qr" element={<WhatsAppQR />} />
       <Route path="/matching-qr" element={<MatchingQR />} />
       <Route path="/events" element={<AllEvents />} />
+      <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
