@@ -1,7 +1,25 @@
 import express from 'express';
+import crypto from 'crypto';
 import SponsorInquiry from '../models/SponsorInquiry.js';
+import { AdminSession } from '../models/AdminAuth.js';
 
 const router = express.Router();
+
+async function requireAdmin(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    if (token) {
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const session = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
+      if (session) return next();
+    }
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
+}
 
 const SPONSOR_TO_EMAIL = process.env.SPONSOR_TO_EMAIL || 'ciao@italiantechclubnyc.com';
 const SPONSOR_FROM_EMAIL = process.env.SPONSOR_FROM_EMAIL || 'ITC Website <onboarding@resend.dev>';
@@ -123,6 +141,47 @@ router.post('/submit', async (req, res) => {
       success: false,
       message: 'Something went wrong. Please try again.',
     });
+  }
+});
+
+/**
+ * GET /api/sponsor/inquiries — list all inquiries (admin only)
+ */
+router.get('/inquiries', requireAdmin, async (_req, res) => {
+  try {
+    const inquiries = await SponsorInquiry.find().sort({ createdAt: -1 }).lean();
+    res.json({ success: true, inquiries, count: inquiries.length });
+  } catch (error) {
+    console.error('Error fetching inquiries:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch inquiries' });
+  }
+});
+
+/**
+ * PUT /api/sponsor/inquiries?id= — update inquiry status (admin only)
+ */
+router.put('/inquiries', requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!['new', 'contacted', 'closed'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const inquiry = await SponsorInquiry.findByIdAndUpdate(
+      req.query.id,
+      { status },
+      { new: true, runValidators: true }
+    );
+    if (!inquiry) {
+      return res.status(404).json({ success: false, message: 'Inquiry not found' });
+    }
+    res.json({ success: true, inquiry });
+  } catch (error) {
+    console.error('Error updating inquiry:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, message: 'Invalid inquiry id' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to update inquiry' });
   }
 });
 

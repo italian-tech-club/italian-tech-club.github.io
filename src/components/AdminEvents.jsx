@@ -5,6 +5,7 @@ import {
   Calendar, MapPin, Clock, Link as LinkIcon, Image as ImageIcon, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import { fileToResizedDataUrl } from '../utils/image';
+import AdminInquiries from './AdminInquiries';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const STORAGE_KEY = 'itc_admin_session';
@@ -383,6 +384,7 @@ const AdminEvents = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [editLoadingId, setEditLoadingId] = useState(null);
   const [toast, setToast] = useState('');
+  const [tab, setTab] = useState('events');
 
   const authHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -446,15 +448,13 @@ const AdminEvents = () => {
     exchange();
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY);
     setAdminKey('');
     setEvents([]);
-  };
+  }, []);
 
-  const handleUnauthorized = () => {
-    handleLogout();
-  };
+  const handleUnauthorized = handleLogout;
 
   // List rows don't include the gallery — fetch the full event before editing,
   // otherwise saving would wipe its photos
@@ -555,20 +555,24 @@ const AdminEvents = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Events Admin</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Admin Panel</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {events.length} event{events.length === 1 ? '' : 's'} in the database
+              {tab === 'events'
+                ? `${events.length} event${events.length === 1 ? '' : 's'} in the database`
+                : 'Sponsorship inquiries sent from the website'}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => { setFormError(''); setEditing('new'); }}
-              className="px-5 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors flex items-center gap-2 shadow-lg shadow-itc-green/20"
-            >
-              <Plus className="w-4 h-4" /> New Event
-            </button>
+            {tab === 'events' && (
+              <button
+                onClick={() => { setFormError(''); setEditing('new'); }}
+                className="px-5 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors flex items-center gap-2 shadow-lg shadow-itc-green/20"
+              >
+                <Plus className="w-4 h-4" /> New Event
+              </button>
+            )}
             <button
               onClick={handleLogout}
               title="Sign out"
@@ -579,13 +583,34 @@ const AdminEvents = () => {
           </div>
         </div>
 
-        {loading && (
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-900 w-fit mb-8">
+          {[['events', 'Events'], ['inquiries', 'Inquiries']].map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-5 py-2 rounded-full text-sm font-bold transition-colors ${
+                tab === key
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'inquiries' && (
+          <AdminInquiries authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
+        )}
+
+        {tab === 'events' && loading && (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
           </div>
         )}
 
-        {loadError && !loading && (
+        {tab === 'events' && loadError && !loading && (
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-itc-red/30 text-center">
             <p className="text-slate-600 dark:text-slate-400 mb-4">{loadError}</p>
             <button onClick={fetchEvents} className="px-5 py-2 rounded-full text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900">
@@ -594,7 +619,7 @@ const AdminEvents = () => {
           </div>
         )}
 
-        {!loading && !loadError && (
+        {tab === 'events' && !loading && !loadError && (
           <div className="space-y-3">
             {events.map((event) => (
               <div
