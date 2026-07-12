@@ -73,10 +73,16 @@ const SponsorPage = () => {
 
     setIsSubmitting(true);
     try {
+      const website = formData.website.trim();
+      const payload = {
+        ...formData,
+        // Accept bare domains like "acme.com"
+        website: website && !/^https?:\/\//i.test(website) ? `https://${website}` : website,
+      };
       const response = await fetch(`${API_URL}/api/sponsor/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -228,12 +234,12 @@ const SponsorPage = () => {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Website</label>
                   <input
-                    type="url"
+                    type="text"
                     name="website"
                     value={formData.website}
                     onChange={handleInputChange}
                     className={inputClasses('website')}
-                    placeholder="https://acme.com"
+                    placeholder="acme.com"
                   />
                 </div>
               </div>
