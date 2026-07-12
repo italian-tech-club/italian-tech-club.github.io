@@ -8,7 +8,8 @@ const eventSchema = new mongoose.Schema({
   time: { type: String, trim: true, maxlength: 50, default: null },
   type: { type: String, required: true, trim: true, maxlength: 50 },
   link: { type: String, trim: true, maxlength: 500, default: null },
-  poster: { type: String, trim: true, maxlength: 500, default: null },
+  // poster and gallery entries hold either repo image paths or base64 data URLs
+  poster: { type: String, trim: true, default: null },
   gallery: { type: [String], default: [] },
 }, {
   timestamps: true,

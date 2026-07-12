@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Lock, Plus, Pencil, Trash2, X, LogOut, Loader2,
+  Lock, Plus, Pencil, Trash2, X, LogOut, Loader2, Upload,
   Calendar, MapPin, Clock, Link as LinkIcon, Image as ImageIcon, AlertCircle, CheckCircle2,
 } from 'lucide-react';
+import { fileToResizedDataUrl } from '../utils/image';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const STORAGE_KEY = 'itc_admin_key';
@@ -19,8 +20,11 @@ const EMPTY_FORM = {
   type: '',
   link: '',
   poster: '',
-  gallery: '',
+  gallery: [],
 };
+
+// Vercel caps request bodies at ~4.5MB; leave headroom
+const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 
 const inputClass =
   'w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-itc-green/50 focus:border-itc-green transition-colors text-sm';
@@ -36,7 +40,7 @@ const eventToForm = (event) => ({
   type: event.type || '',
   link: event.link || '',
   poster: event.poster || '',
-  gallery: (event.gallery || []).join('\n'),
+  gallery: event.gallery || [],
 });
 
 const formToPayload = (form) => ({
@@ -48,10 +52,7 @@ const formToPayload = (form) => ({
   type: form.type.trim(),
   link: form.link.trim() || null,
   poster: form.poster.trim() || null,
-  gallery: form.gallery
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean),
+  gallery: form.gallery.map((entry) => entry.trim()).filter(Boolean),
 });
 
 const LoginGate = ({ onLogin }) => {
@@ -134,8 +135,49 @@ const LoginGate = ({ onLogin }) => {
 
 const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit }) => {
   const [form, setForm] = useState(initialForm);
+  const [uploading, setUploading] = useState(false);
+  const [manualPath, setManualPath] = useState('');
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handlePosterFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const dataUrl = await fileToResizedDataUrl(file, 1000, 0.8);
+      setForm((f) => ({ ...f, poster: dataUrl }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleGalleryFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = [];
+      for (const file of files) {
+        urls.push(await fileToResizedDataUrl(file, 1600, 0.8));
+      }
+      setForm((f) => ({ ...f, gallery: [...f.gallery, ...urls] }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeGalleryImage = (idx) =>
+    setForm((f) => ({ ...f, gallery: f.gallery.filter((_, i) => i !== idx) }));
+
+  const addManualPath = () => {
+    const path = manualPath.trim();
+    if (!path) return;
+    setForm((f) => ({ ...f, gallery: [...f.gallery, path] }));
+    setManualPath('');
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -207,20 +249,87 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit }) =
             <input type="url" value={form.link} onChange={set('link')} placeholder="https://..." className={inputClass} />
           </div>
           <div className="md:col-span-2">
-            <label className={labelClass}>Poster Path</label>
-            <input type="text" value={form.poster} onChange={set('poster')} placeholder="/images/events/my-event/poster.png" className={inputClass} />
+            <label className={labelClass}>Poster</label>
+            <div className="flex items-start gap-3">
+              {form.poster && (
+                <div className="relative w-24 h-24 flex-shrink-0">
+                  <img
+                    src={form.poster}
+                    alt="Poster preview"
+                    className="w-full h-full object-cover rounded-xl border border-slate-200 dark:border-slate-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, poster: '' }))}
+                    className="absolute -top-2 -right-2 p-1 rounded-full bg-itc-red text-white shadow"
+                    title="Remove poster"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+              <div className="flex-grow space-y-2">
+                <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors">
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  Upload image
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePosterFile} />
+                </label>
+                {!form.poster.startsWith('data:') && (
+                  <input
+                    type="text"
+                    value={form.poster}
+                    onChange={set('poster')}
+                    placeholder="…or a repo path / URL: /images/events/my-event/poster.png"
+                    className={inputClass}
+                  />
+                )}
+              </div>
+            </div>
           </div>
           <div className="md:col-span-2">
-            <label className={labelClass}>Gallery Paths (one per line)</label>
-            <textarea
-              rows={4}
-              value={form.gallery}
-              onChange={set('gallery')}
-              placeholder={'/images/events/my-event/img1.jpg\n/images/events/my-event/img2.jpg'}
-              className={`${inputClass} font-mono text-xs resize-y`}
-            />
+            <label className={labelClass}>Gallery ({form.gallery.length} photo{form.gallery.length === 1 ? '' : 's'})</label>
+            <div className="flex flex-wrap gap-3">
+              {form.gallery.map((src, idx) => (
+                <div key={idx} className="relative w-20 h-20">
+                  <img
+                    src={src}
+                    alt={`Gallery ${idx + 1}`}
+                    className="w-full h-full object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeGalleryImage(idx)}
+                    className="absolute -top-2 -right-2 p-1 rounded-full bg-itc-red text-white shadow"
+                    title="Remove photo"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <label className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 hover:border-itc-green hover:text-itc-green cursor-pointer transition-colors">
+                {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryFiles} />
+              </label>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <input
+                type="text"
+                value={manualPath}
+                onChange={(e) => setManualPath(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addManualPath(); } }}
+                placeholder="…or add a repo path / URL: /images/events/my-event/img1.jpg"
+                className={`${inputClass} font-mono text-xs`}
+              />
+              <button
+                type="button"
+                onClick={addManualPath}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+              >
+                Add
+              </button>
+            </div>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-              Image files still need to be committed to the repo under <code className="font-mono">public/images/events/</code> (or use full external URLs).
+              Uploaded photos are compressed and stored in the database — no repo commit needed.
             </p>
           </div>
         </div>
@@ -241,7 +350,7 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit }) =
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || uploading}
             className="px-6 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -262,6 +371,7 @@ const AdminEvents = () => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [editLoadingId, setEditLoadingId] = useState(null);
   const [toast, setToast] = useState('');
 
   const authHeaders = useCallback(() => ({
@@ -308,17 +418,41 @@ const AdminEvents = () => {
     handleLogout();
   };
 
+  // List rows don't include the gallery — fetch the full event before editing,
+  // otherwise saving would wipe its photos
+  const startEdit = async (event) => {
+    setFormError('');
+    setEditLoadingId(event._id);
+    try {
+      const response = await fetch(`${API_URL}/api/events?id=${event._id}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message);
+      setEditing(data.event);
+    } catch {
+      showToast('Could not load event details. Try again.');
+    } finally {
+      setEditLoadingId(null);
+    }
+  };
+
   const handleSave = async (form) => {
-    setSaving(true);
     setFormError('');
     const isEdit = editing !== 'new';
 
+    const payload = JSON.stringify(formToPayload(form));
+    const payloadBytes = new Blob([payload]).size;
+    if (payloadBytes > MAX_PAYLOAD_BYTES) {
+      setFormError(`Event is too large (${(payloadBytes / 1024 / 1024).toFixed(1)}MB, max 4MB). Remove some photos or use repo paths instead of uploads.`);
+      return;
+    }
+
+    setSaving(true);
     try {
       const url = isEdit ? `${API_URL}/api/events?id=${editing._id}` : `${API_URL}/api/events`;
       const response = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
         headers: authHeaders(),
-        body: JSON.stringify(formToPayload(form)),
+        body: payload,
       });
 
       if (response.status === 401) return handleUnauthorized();
@@ -440,19 +574,20 @@ const AdminEvents = () => {
                       <span className="truncate">{event.location}</span>
                     </span>
                     {event.link && <span className="flex items-center gap-1"><LinkIcon className="w-3 h-3" /> link</span>}
-                    {(event.gallery?.length || 0) > 0 && (
-                      <span className="flex items-center gap-1"><ImageIcon className="w-3 h-3" /> {event.gallery.length} photos</span>
+                    {(event.galleryCount ?? event.gallery?.length ?? 0) > 0 && (
+                      <span className="flex items-center gap-1"><ImageIcon className="w-3 h-3" /> {event.galleryCount ?? event.gallery.length} photos</span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={() => { setFormError(''); setEditing(event); }}
-                    className="p-2.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-itc-green transition-colors"
+                    onClick={() => startEdit(event)}
+                    disabled={editLoadingId === event._id}
+                    className="p-2.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-itc-green transition-colors disabled:opacity-50"
                     title="Edit"
                   >
-                    <Pencil className="w-4 h-4" />
+                    {editLoadingId === event._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => handleDelete(event)}

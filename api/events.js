@@ -30,7 +30,8 @@ const eventSchema = new mongoose.Schema({
   time: { type: String, trim: true, maxlength: 50, default: null },
   type: { type: String, required: true, trim: true, maxlength: 50 },
   link: { type: String, trim: true, maxlength: 500, default: null },
-  poster: { type: String, trim: true, maxlength: 500, default: null },
+  // poster and gallery entries hold either repo image paths or base64 data URLs
+  poster: { type: String, trim: true, default: null },
   gallery: { type: [String], default: [] },
 }, {
   timestamps: true,
@@ -84,9 +85,24 @@ export default async function handler(req, res) {
   try {
     await connectDB();
 
-    // Public: list all events, newest first
+    // Public: single event with full gallery, or list of all events.
+    // The list omits gallery contents (base64 images would blow up the
+    // payload) and exposes galleryCount instead; galleries are fetched
+    // per-event on demand.
     if (req.method === 'GET') {
-      const events = await Event.find().sort({ date: -1 }).lean();
+      if (req.query.id) {
+        const event = await Event.findById(req.query.id).lean();
+        if (!event) {
+          return res.status(404).json({ success: false, message: 'Event not found' });
+        }
+        return res.status(200).json({ success: true, event });
+      }
+
+      const events = await Event.aggregate([
+        { $addFields: { galleryCount: { $size: { $ifNull: ['$gallery', []] } } } },
+        { $project: { gallery: 0 } },
+        { $sort: { date: -1 } },
+      ]);
       return res.status(200).json({ success: true, events });
     }
 

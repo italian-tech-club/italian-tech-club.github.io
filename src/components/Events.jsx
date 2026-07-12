@@ -11,6 +11,7 @@ const HOMEPAGE_EVENTS_LIMIT = 4;
 const GalleryModal = ({ event, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const images = event.gallery || [];
+  const isLoading = event.loading && images.length === 0;
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -52,8 +53,11 @@ const GalleryModal = ({ event, onClose }) => {
       </button>
 
       <div className="relative w-full max-w-5xl aspect-video flex items-center justify-center">
+        {isLoading && (
+          <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        )}
         <AnimatePresence mode="wait">
-          <motion.img
+          {images.length > 0 && <motion.img
             key={currentIndex}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -62,7 +66,7 @@ const GalleryModal = ({ event, onClose }) => {
             alt={`Gallery image ${currentIndex + 1}`}
             className="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
-          />
+          />}
         </AnimatePresence>
 
         {images.length > 1 && (
@@ -100,14 +104,14 @@ const GalleryModal = ({ event, onClose }) => {
       
       <div className="absolute top-4 left-4 text-white">
         <h3 className="text-xl font-bold">{event.title}</h3>
-        <p className="text-white/60 text-sm">{currentIndex + 1} / {images.length}</p>
+        <p className="text-white/60 text-sm">{images.length > 0 ? `${currentIndex + 1} / ${images.length}` : 'Loading photos…'}</p>
       </div>
     </motion.div>
   );
 };
 
-const EventCard = ({ date, month, title, subtitle, location, time, type, link, isPast, delay, poster, gallery, onOpenGallery }) => {
-  const hasGallery = isPast && gallery && gallery.length > 0;
+const EventCard = ({ date, month, title, subtitle, location, time, type, link, isPast, delay, poster, gallery, galleryCount, onOpenGallery }) => {
+  const hasGallery = isPast && ((gallery?.length || 0) > 0 || (galleryCount || 0) > 0);
   
   return (
     <motion.div
@@ -124,8 +128,8 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
       {/* Media column (fixed size so poster & calendar match) */}
       <div className="flex-shrink-0 w-32 aspect-square">
         {poster ? (
-          <div 
-            onClick={() => hasGallery && onOpenGallery({ title, gallery })}
+          <div
+            onClick={() => hasGallery && onOpenGallery()}
             className={`w-full h-full rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 ${hasGallery ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
           >
             <img 
@@ -193,8 +197,8 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
 
       <div className="flex-shrink-0 mt-4 md:mt-0 w-full md:w-auto">
         {hasGallery ? (
-          <button 
-            onClick={() => onOpenGallery({ title, gallery })}
+          <button
+            onClick={() => onOpenGallery()}
             className="w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
           >
             <ImageIcon className="w-4 h-4" />
@@ -243,6 +247,31 @@ const Events = ({ showAll = false }) => {
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
+
+  // Galleries are not included in the list payload (only galleryCount);
+  // fetch the full event on demand when a gallery is opened.
+  const openGallery = async (event) => {
+    if (event.gallery && event.gallery.length > 0) {
+      setSelectedGalleryEvent({ title: event.title, gallery: event.gallery });
+      return;
+    }
+
+    setSelectedGalleryEvent({ title: event.title, gallery: [], loading: true });
+    try {
+      const res = await fetch(`${API_URL}/api/events?id=${event._id}`);
+      const data = await res.json();
+      setSelectedGalleryEvent((current) => {
+        if (!current || current.title !== event.title) return current; // modal was closed meanwhile
+        return data.success
+          ? { title: event.title, gallery: data.event.gallery || [] }
+          : null;
+      });
+    } catch {
+      setSelectedGalleryEvent((current) =>
+        current && current.title === event.title ? null : current
+      );
+    }
+  };
 
   // Helper function to parse date string as local date (not UTC)
   const parseLocalDate = (dateString) => {
@@ -353,7 +382,8 @@ const Events = ({ showAll = false }) => {
                           delay={Math.min(index * 0.1, 0.5)}
                           poster={event.poster}
                           gallery={event.gallery}
-                          onOpenGallery={setSelectedGalleryEvent}
+                          galleryCount={event.galleryCount}
+                          onOpenGallery={() => openGallery(event)}
                       />
                     );
                   })}
@@ -398,7 +428,8 @@ const Events = ({ showAll = false }) => {
                           delay={Math.min(index * 0.1, 0.5)}
                           poster={event.poster}
                           gallery={event.gallery}
-                          onOpenGallery={setSelectedGalleryEvent}
+                          galleryCount={event.galleryCount}
+                          onOpenGallery={() => openGallery(event)}
                       />
                     );
                   })}

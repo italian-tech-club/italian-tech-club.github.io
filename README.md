@@ -42,5 +42,7 @@ npm run migrate:events
 
 ### Notes
 
-- Event poster and gallery fields are image *paths*. The image files themselves must still be committed to the repo under `public/images/events/` (or be full external URLs) — the serverless API has no file storage.
+- Poster and gallery images can be uploaded directly in the admin panel — they are downscaled client-side and stored in MongoDB as base64 data URLs. Repo paths (`/images/events/...`) and external URLs also still work.
+- The list endpoint (`GET /api/events`) omits gallery contents and returns `galleryCount`; the full gallery is fetched per event via `GET /api/events?id=<id>` when a gallery is opened. Keeps the homepage payload small.
+- Events are capped at ~4MB each (Vercel request/response body limit).
 - Local dev: `npm run dev:all` runs Vite and the Express API (`server/`) that mirrors the Vercel functions in `api/`.

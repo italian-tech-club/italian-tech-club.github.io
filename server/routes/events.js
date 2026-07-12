@@ -39,15 +39,30 @@ function pickEventFields(body) {
 }
 
 /**
- * GET /api/events
- * Public list of all events, newest first
+ * GET /api/events            — public list, newest first (gallery omitted, galleryCount added)
+ * GET /api/events?id=<id>    — public single event with full gallery
  */
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const events = await Event.find().sort({ date: -1 }).lean();
+    if (req.query.id) {
+      const event = await Event.findById(req.query.id).lean();
+      if (!event) {
+        return res.status(404).json({ success: false, message: 'Event not found' });
+      }
+      return res.json({ success: true, event });
+    }
+
+    const events = await Event.aggregate([
+      { $addFields: { galleryCount: { $size: { $ifNull: ['$gallery', []] } } } },
+      { $project: { gallery: 0 } },
+      { $sort: { date: -1 } },
+    ]);
     return res.json({ success: true, events });
   } catch (error) {
     console.error('Error fetching events:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, message: 'Invalid event id' });
+    }
     return res.status(500).json({ success: false, message: 'Failed to fetch events' });
   }
 });
