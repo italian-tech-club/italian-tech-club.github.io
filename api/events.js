@@ -45,18 +45,27 @@ const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
 
 const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery'];
 
-function isAuthorized(req) {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) return false;
+// Admin sessions created by /api/admin/auth (magic-link login)
+const adminSessionSchema = new mongoose.Schema({
+  tokenHash: { type: String, required: true, unique: true },
+  email: { type: String, required: true, lowercase: true },
+  expiresAt: { type: Date, required: true },
+}, {
+  timestamps: true,
+  collection: 'admin_sessions',
+});
+adminSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const AdminSession = mongoose.models.AdminSession || mongoose.model('AdminSession', adminSessionSchema);
+
+async function isAuthorized(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return false;
 
-  // Hash both sides so timingSafeEqual gets equal-length buffers
-  const a = crypto.createHash('sha256').update(token).digest();
-  const b = crypto.createHash('sha256').update(adminPassword).digest();
-  return crypto.timingSafeEqual(a, b);
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const session = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
+  return !!session;
 }
 
 function pickEventFields(body) {
@@ -106,13 +115,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, events });
     }
 
-    // Everything below requires the admin password
-    if (!isAuthorized(req)) {
+    // Everything below requires a valid admin session
+    if (!(await isAuthorized(req))) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
     if (req.method === 'POST') {
-      // Password check for the admin login gate
+      // Session validity check for the admin panel
       if (req.body?.action === 'verify') {
         return res.status(200).json({ success: true });
       }

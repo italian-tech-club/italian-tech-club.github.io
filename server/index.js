@@ -3,8 +3,10 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import cofounderRoutes from './routes/cofounder.js';
+import communityRoutes from './routes/community.js';
 import sponsorRoutes from './routes/sponsor.js';
 import eventsRoutes from './routes/events.js';
+import adminAuthRoutes from './routes/adminAuth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,8 +20,10 @@ app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 
 // Routes
 app.use('/api/cofounder', cofounderRoutes);
+app.use('/api/community', communityRoutes);
 app.use('/api/sponsor', sponsorRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

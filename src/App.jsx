@@ -18,6 +18,11 @@ import AllEvents from './components/AllEvents';
 import Sponsor from './components/Sponsor';
 import SponsorPage from './components/SponsorPage';
 import AdminEvents from './components/AdminEvents';
+import CommunityTeaser from './components/CommunityTeaser';
+import Community from './components/Community';
+import CommunityJoin from './components/CommunityJoin';
+import CommunityManage from './components/CommunityManage';
+import { COMMUNITY_ENABLED } from './config';
 
 // Homepage component with all sections
 const HomePage = () => {
@@ -43,6 +48,7 @@ const HomePage = () => {
         <Activities />
         <Events />
         <Team />
+        {COMMUNITY_ENABLED && <CommunityTeaser />}
         <Sponsor />
         <Contact />
       </main>
@@ -68,6 +74,13 @@ function App() {
       <Route path="/qr" element={<WhatsAppQR />} />
       <Route path="/matching-qr" element={<MatchingQR />} />
       <Route path="/events" element={<AllEvents />} />
+      {COMMUNITY_ENABLED && (
+        <>
+          <Route path="/community" element={<Community />} />
+          <Route path="/community/join" element={<CommunityJoin />} />
+          <Route path="/community/manage" element={<CommunityManage />} />
+        </>
+      )}
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/admin" element={<AdminEvents />} />
       <Route path="*" element={<NotFound />} />

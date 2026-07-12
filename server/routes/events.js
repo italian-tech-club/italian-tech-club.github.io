@@ -1,30 +1,32 @@
 import express from 'express';
 import crypto from 'crypto';
 import Event from '../models/Event.js';
+import { AdminSession } from '../models/AdminAuth.js';
 
 const router = express.Router();
 
 const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery'];
 
-function isAuthorized(req) {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) return false;
-
+async function isAuthorized(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return false;
 
-  // Hash both sides so timingSafeEqual gets equal-length buffers
-  const a = crypto.createHash('sha256').update(token).digest();
-  const b = crypto.createHash('sha256').update(adminPassword).digest();
-  return crypto.timingSafeEqual(a, b);
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const session = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
+  return !!session;
 }
 
-function requireAdmin(req, res, next) {
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
+async function requireAdmin(req, res, next) {
+  try {
+    if (!(await isAuthorized(req))) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    next();
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong' });
   }
-  next();
 }
 
 function pickEventFields(body) {

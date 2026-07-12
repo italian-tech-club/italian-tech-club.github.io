@@ -7,7 +7,7 @@ import {
 import { fileToResizedDataUrl } from '../utils/image';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const STORAGE_KEY = 'itc_admin_key';
+const STORAGE_KEY = 'itc_admin_session';
 
 const EVENT_TYPES = ['Networking', 'Talk', 'Launch Party', "Members' Dinner", "Members' Brunch"];
 
@@ -55,31 +55,27 @@ const formToPayload = (form) => ({
   gallery: form.gallery.map((entry) => entry.trim()).filter(Boolean),
 });
 
-const LoginGate = ({ onLogin }) => {
-  const [password, setPassword] = useState('');
+const LoginGate = ({ error: externalError }) => {
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password || loading) return;
+    if (!email || loading) return;
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/events`, {
+      const response = await fetch(`${API_URL}/api/admin/auth`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${password}`,
-        },
-        body: JSON.stringify({ action: 'verify' }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request', email }),
       });
 
       if (response.ok) {
-        onLogin(password);
-      } else if (response.status === 401) {
-        setError('Wrong password');
+        setSent(true);
       } else {
         setError('Something went wrong. Please try again.');
       }
@@ -102,32 +98,44 @@ const LoginGate = ({ onLogin }) => {
           <Lock className="w-5 h-5 text-white dark:text-slate-900" />
         </div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-1">Admin Panel</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
-          Enter the admin password to manage events
-        </p>
 
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          autoFocus
-          className={inputClass}
-        />
+        {sent ? (
+          <div className="text-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
+              If <span className="font-medium text-slate-700 dark:text-slate-300">{email}</span> is authorized,
+              a login link is on its way. Check your inbox — the link expires in 15 minutes.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+              Enter your admin email to receive a login link
+            </p>
 
-        {error && (
-          <p className="flex items-center gap-2 text-sm text-itc-red mt-3">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-          </p>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoFocus
+              className={inputClass}
+            />
+
+            {(error || externalError) && (
+              <p className="flex items-center gap-2 text-sm text-itc-red mt-3">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error || externalError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !email}
+              className="w-full mt-6 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email Me a Login Link'}
+            </button>
+          </>
         )}
-
-        <button
-          type="submit"
-          disabled={loading || !password}
-          className="w-full mt-6 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
-        </button>
       </motion.form>
     </div>
   );
@@ -364,6 +372,8 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit }) =
 
 const AdminEvents = () => {
   const [adminKey, setAdminKey] = useState(() => sessionStorage.getItem(STORAGE_KEY) || '');
+  const [exchanging, setExchanging] = useState(() => new URLSearchParams(window.location.search).has('token'));
+  const [loginError, setLoginError] = useState('');
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -403,10 +413,38 @@ const AdminEvents = () => {
     if (adminKey) fetchEvents();
   }, [adminKey, fetchEvents]);
 
-  const handleLogin = (password) => {
-    sessionStorage.setItem(STORAGE_KEY, password);
-    setAdminKey(password);
-  };
+  // Exchange the emailed magic-link token for a session token
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (!token) return;
+
+    // Strip the token from the URL immediately (browser history hygiene)
+    window.history.replaceState({}, '', window.location.pathname);
+
+    const exchange = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'exchange', token }),
+        });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          sessionStorage.setItem(STORAGE_KEY, data.sessionToken);
+          setAdminKey(data.sessionToken);
+        } else {
+          setLoginError(data.message || 'This login link is invalid or has expired.');
+        }
+      } catch {
+        setLoginError('Could not reach the server. Please try again.');
+      } finally {
+        setExchanging(false);
+      }
+    };
+    exchange();
+  }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem(STORAGE_KEY);
@@ -500,8 +538,18 @@ const AdminEvents = () => {
     }
   };
 
+  if (exchanging) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin" /> Signing you in...
+        </div>
+      </div>
+    );
+  }
+
   if (!adminKey) {
-    return <LoginGate onLogin={handleLogin} />;
+    return <LoginGate error={loginError} />;
   }
 
   return (
