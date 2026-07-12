@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import cofounderRoutes from './routes/cofounder.js';
 import sponsorRoutes from './routes/sponsor.js';
+import eventsRoutes from './routes/events.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +19,7 @@ app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 // Routes
 app.use('/api/cofounder', cofounderRoutes);
 app.use('/api/sponsor', sponsorRoutes);
+app.use('/api/events', eventsRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

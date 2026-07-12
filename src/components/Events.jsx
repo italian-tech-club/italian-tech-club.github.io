@@ -4,6 +4,8 @@ import { MapPin, ArrowRight, CalendarCheck, Clock, Image as ImageIcon, X, Chevro
 import { Link } from 'react-router-dom';
 import eventsData from '../data/events.json';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const HOMEPAGE_EVENTS_LIMIT = 4;
 
 const GalleryModal = ({ event, onClose }) => {
@@ -226,6 +228,21 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
 
 const Events = ({ showAll = false }) => {
   const [selectedGalleryEvent, setSelectedGalleryEvent] = useState(null);
+  // Bundled events.json renders immediately and stays as fallback if the API is unreachable
+  const [events, setEvents] = useState(eventsData);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_URL}/api/events`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data.success && Array.isArray(data.events) && data.events.length > 0) {
+          setEvents(data.events);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Helper function to parse date string as local date (not UTC)
   const parseLocalDate = (dateString) => {
@@ -242,7 +259,7 @@ const Events = ({ showAll = false }) => {
     const upcoming = [];
     const past = [];
 
-    eventsData.forEach((event) => {
+    events.forEach((event) => {
       const eventDate = parseLocalDate(event.date);
       eventDate.setHours(0, 0, 0, 0);
       
@@ -259,7 +276,7 @@ const Events = ({ showAll = false }) => {
     past.sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
 
     return { upcomingEvents: upcoming, pastEvents: past };
-  }, []);
+  }, [events]);
 
   const totalEvents = upcomingEvents.length + pastEvents.length;
   const displayedUpcoming = showAll

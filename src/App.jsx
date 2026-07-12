@@ -17,6 +17,7 @@ import MatchingQR from './components/MatchingQR';
 import AllEvents from './components/AllEvents';
 import Sponsor from './components/Sponsor';
 import SponsorPage from './components/SponsorPage';
+import AdminEvents from './components/AdminEvents';
 
 // Homepage component with all sections
 const HomePage = () => {
@@ -68,6 +69,7 @@ function App() {
       <Route path="/matching-qr" element={<MatchingQR />} />
       <Route path="/events" element={<AllEvents />} />
       <Route path="/sponsor" element={<SponsorPage />} />
+      <Route path="/admin" element={<AdminEvents />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
