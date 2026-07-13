@@ -28,7 +28,9 @@ const communityProfileSchema = new mongoose.Schema({
   },
   profilePic: {
     type: String,
-    required: [true, 'Profile picture is required'],
+    // Founders may go live without a photo (initials avatar renders instead)
+    required: [function () { return !this.isFounder; }, 'Profile picture is required'],
+    default: null,
   },
   profession: {
     type: String,
@@ -53,6 +55,10 @@ const communityProfileSchema = new mongoose.Schema({
     default: 'pending',
   },
   emailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isFounder: {
     type: Boolean,
     default: false,
   },

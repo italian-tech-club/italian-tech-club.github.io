@@ -27,12 +27,13 @@ const communityProfileSchema = new mongoose.Schema({
   lastName: { type: String, required: true, trim: true, maxlength: 50 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   linkedIn: { type: String, required: true, trim: true },
-  profilePic: { type: String, required: true },
+  profilePic: { type: String, required: function () { return !this.isFounder; }, default: null },
   profession: { type: String, required: true, trim: true, maxlength: 100 },
   company: { type: String, trim: true, maxlength: 100, default: '' },
   bio: { type: String, maxlength: 500, default: '' },
   status: { type: String, enum: ['pending', 'approved', 'inactive'], default: 'pending' },
   emailVerified: { type: Boolean, default: false },
+  isFounder: { type: Boolean, default: false },
   manageTokenHash: { type: String, default: null },
   manageTokenExpiry: { type: Date, default: null },
 }, {
@@ -161,6 +162,7 @@ export default async function handler(req, res) {
           company: profile.company,
           bio: profile.bio,
           status: profile.status,
+          isFounder: profile.isFounder,
         },
       });
     }
@@ -181,8 +183,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'Profile updated!' });
     }
 
-    // Delete own profile
+    // Delete own profile (founder profiles are permanent)
     if (req.method === 'DELETE') {
+      if (profile.isFounder) {
+        return res.status(403).json({ success: false, message: 'Founder profiles cannot be deleted.' });
+      }
       await profile.deleteOne();
       return res.status(200).json({ success: true, message: 'Profile deleted.' });
     }

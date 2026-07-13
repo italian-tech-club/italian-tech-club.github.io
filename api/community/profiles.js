@@ -26,11 +26,12 @@ const communityProfileSchema = new mongoose.Schema({
   lastName: { type: String, required: true },
   email: { type: String, required: true },
   linkedIn: { type: String, required: true },
-  profilePic: { type: String, required: true },
+  profilePic: { type: String, required: function () { return !this.isFounder; }, default: null },
   profession: { type: String, required: true },
   company: { type: String, default: '' },
   bio: { type: String, default: '' },
   status: { type: String, default: 'pending' },
+  isFounder: { type: Boolean, default: false },
 }, {
   timestamps: true,
   collection: 'community_profiles',
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
     const profiles = await CommunityProfile.find(
       { status: 'approved' }
     )
-    .select('firstName lastName linkedIn profilePic profession company bio createdAt')
+    .select('firstName lastName linkedIn profilePic profession company bio isFounder createdAt')
     .sort({ createdAt: -1 });
 
     return res.status(200).json({

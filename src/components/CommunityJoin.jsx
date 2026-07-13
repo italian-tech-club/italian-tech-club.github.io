@@ -18,7 +18,7 @@ import ThemeToggle from './ThemeToggle';
 
 const PROFILE_PIC_SIZE = 400;
 const MAX_FILE_SIZE_MB = 5;
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const container = {
   hidden: { opacity: 0 },

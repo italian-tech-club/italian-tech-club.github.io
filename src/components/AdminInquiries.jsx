@@ -3,7 +3,7 @@ import {
   Loader2, Mail, Globe, Calendar, Inbox, Reply,
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const TYPE_LABELS = {
   event: 'Sponsor an event',

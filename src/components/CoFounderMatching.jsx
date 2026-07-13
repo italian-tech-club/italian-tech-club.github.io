@@ -22,7 +22,7 @@ import ThemeToggle from './ThemeToggle';
 const PROFILE_PIC_SIZE = 400; // Required dimensions in pixels
 const MAX_FILE_SIZE_MB = 5;
 // In production, use Vercel API. In development, use local Express server
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const ROLE_OPTIONS = [
   { value: 'technical', label: 'Technical', emoji: '👨‍💻', description: 'Engineer, Developer, Data Scientist' },

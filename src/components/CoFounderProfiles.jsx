@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const ROLE_CONFIG = {
   technical: { label: 'Technical', emoji: '👨‍💻', color: 'bg-blue-500', lightColor: 'bg-blue-50 dark:bg-blue-900/30', textColor: 'text-blue-600 dark:text-blue-400' },

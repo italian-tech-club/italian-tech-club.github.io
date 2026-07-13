@@ -7,7 +7,7 @@ import { fadeRise, staggerContainer, VIEWPORT } from '../lib/motion';
 const PERKS = [
   'Brand visibility with 500+ Italian tech professionals in NYC',
   'Speaking opportunities at our events',
-  'Direct access to founders, engineers, and operators',
+  'Direct access to founders, investors, and engineers',
 ];
 
 const Sponsor = () => {

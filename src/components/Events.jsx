@@ -6,7 +6,7 @@ import eventsData from '../data/events.json';
 import { EASE, fadeRise, hoverSpring, VIEWPORT } from '../lib/motion';
 import SectionEyebrow from './SectionEyebrow';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const HOMEPAGE_EVENTS_LIMIT = 4;
 

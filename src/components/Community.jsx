@@ -14,9 +14,8 @@ import {
   Star,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
-import foundersData from '../data/founders.json';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const GRADIENTS = [
   'from-itc-green to-emerald-700',
@@ -185,7 +184,6 @@ const Community = () => {
           setProfiles(data.profiles);
         }
       } catch (err) {
-        // Founders still render from static data even when the API is unreachable
         console.error('Failed to load community profiles:', err);
       } finally {
         setLoading(false);
@@ -194,8 +192,12 @@ const Community = () => {
     fetchProfiles();
   }, []);
 
-  // Founders first, then community members newest-first
-  const allProfiles = [...foundersData, ...profiles];
+  // Founders first (oldest-first = seed order), then community members newest-first
+  const founders = profiles
+    .filter((p) => p.isFounder)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const members = profiles.filter((p) => !p.isFounder);
+  const allProfiles = [...founders, ...members];
 
   const filteredProfiles = allProfiles.filter((profile) => {
     if (!searchTerm) return true;
@@ -249,7 +251,7 @@ const Community = () => {
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-itc-green to-itc-red"> Community</span>
           </h1>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto px-4">
-            The founders, engineers, designers, and operators of the Italian Tech Club NYC. Create your profile and connect with fellow members.
+            The innovators, founders, investors, and engineers of the Italian Tech Club NYC. Create your profile and connect with fellow members.
           </p>
           <Link
             to="/community/join"
@@ -284,7 +286,7 @@ const Community = () => {
           </div>
         </motion.div>
 
-        {/* Loading indicator for API profiles (founders render immediately) */}
+        {/* Loading indicator */}
         {loading && (
           <div className="flex items-center justify-center gap-2 text-slate-400 text-sm mb-6">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -293,7 +295,7 @@ const Community = () => {
         )}
 
         {/* No Results */}
-        {filteredProfiles.length === 0 && (
+        {!loading && filteredProfiles.length === 0 && (
           <div className="text-center py-20">
             <Search className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No matches found</h3>

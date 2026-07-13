@@ -7,7 +7,7 @@ import {
 import { fileToResizedDataUrl } from '../utils/image';
 import AdminInquiries from './AdminInquiries';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 const STORAGE_KEY = 'itc_admin_session';
 
 const EVENT_TYPES = ['Networking', 'Talk', 'Launch Party', "Members' Dinner", "Members' Brunch"];

@@ -119,7 +119,7 @@ router.get('/profiles', async (req, res) => {
     const profiles = await CommunityProfile.find(
       { status: 'approved' }
     )
-    .select('firstName lastName linkedIn profilePic profession company bio createdAt')
+    .select('firstName lastName linkedIn profilePic profession company bio isFounder createdAt')
     .sort({ createdAt: -1 });
 
     res.json({
@@ -207,6 +207,7 @@ router.get('/manage', async (req, res) => {
         company: profile.company,
         bio: profile.bio,
         status: profile.status,
+        isFounder: profile.isFounder,
       },
     });
   } catch (error) {
@@ -255,6 +256,10 @@ router.delete('/manage', async (req, res) => {
     const profile = await findProfileByToken(req.query.token);
     if (!profile) {
       return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
+    }
+
+    if (profile.isFounder) {
+      return res.status(403).json({ success: false, message: 'Founder profiles cannot be deleted.' });
     }
 
     await profile.deleteOne();

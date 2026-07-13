@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const SPONSORSHIP_OPTIONS = [
   { value: 'event', label: 'Sponsor an event', icon: Megaphone },
@@ -29,7 +29,7 @@ const SPONSORSHIP_OPTIONS = [
 const PERKS = [
   'Brand visibility with 500+ Italian tech professionals in NYC',
   'Speaking opportunities at our events',
-  'Direct access to founders, engineers, and operators',
+  'Direct access to founders, investors, and engineers',
   'Logo on event materials and our website',
 ];
 

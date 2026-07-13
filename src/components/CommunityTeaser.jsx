@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Users, ArrowRight, UserPlus } from 'lucide-react';
-import foundersData from '../data/founders.json';
+
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const GRADIENTS = [
   'from-itc-green to-emerald-700',
@@ -13,6 +14,28 @@ const GRADIENTS = [
 ];
 
 const CommunityTeaser = () => {
+  const [founders, setFounders] = useState([]);
+
+  useEffect(() => {
+    const fetchFounders = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/community/profiles`);
+        const data = await response.json();
+        if (data.success) {
+          setFounders(
+            data.profiles
+              .filter((p) => p.isFounder)
+              .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+          );
+        }
+      } catch (err) {
+        // Decorative avatar stack — the "+you" bubble still renders on its own
+        console.error('Failed to load founder profiles:', err);
+      }
+    };
+    fetchFounders();
+  }, []);
+
   return (
     <section id="community" className="py-24 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -36,15 +59,15 @@ const CommunityTeaser = () => {
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet the Community</h2>
             <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-8">
               Browse member profiles, see who's building what, and connect on LinkedIn.
-              Founders, engineers, designers, and operators — all in one place.
+              Founders, investors, engineers, and tech enthusiasts — all in one place.
             </p>
 
             {/* Founder avatars */}
             <div className="flex justify-center mb-8">
               <div className="flex -space-x-3">
-                {foundersData.map((founder, index) => (
+                {founders.map((founder, index) => (
                   <div
-                    key={founder.id}
+                    key={founder._id}
                     className={`w-12 h-12 rounded-full bg-gradient-to-br ${GRADIENTS[index % GRADIENTS.length]} border-2 border-slate-900 dark:border-black flex items-center justify-center text-sm font-bold overflow-hidden`}
                     title={`${founder.firstName} ${founder.lastName}`}
                   >
