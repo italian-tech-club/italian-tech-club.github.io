@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // Important for GitHub Pages if not using a custom domain at root, but we'll see. Usually repo name.
+  // Absolute base so hashed assets resolve from the domain root on nested
+  // routes (e.g. /community/manage). Relative './' 404s at depth ≥ 2 on Vercel.
+  base: '/',
   server: {
     host: true, // bind 0.0.0.0 so other devices on the LAN can connect
     proxy: {
