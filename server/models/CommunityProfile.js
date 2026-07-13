@@ -21,15 +21,18 @@ const communityProfileSchema = new mongoose.Schema({
     trim: true,
     match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please enter a valid email'],
   },
+  // Optional so pre-seeded members (imported from the historical roster) can be
+  // stored before they claim and fill in the details. New self-submissions still
+  // require it at the API layer.
   linkedIn: {
     type: String,
-    required: [true, 'LinkedIn profile is required'],
     trim: true,
+    default: '',
   },
   profilePic: {
+    // Founders and pre-seeded members may go live without a photo (initials
+    // avatar renders instead). New self-submissions require it at the API layer.
     type: String,
-    // Founders may go live without a photo (initials avatar renders instead)
-    required: [function () { return !this.isFounder; }, 'Profile picture is required'],
     default: null,
   },
   profession: {
@@ -51,7 +54,11 @@ const communityProfileSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'inactive'],
+    // unclaimed  → seeded but not yet consented/claimed; hidden from the directory
+    // pending    → new self-submission awaiting admin approval; hidden
+    // approved   → live in the directory
+    // inactive   → hidden, kept for records
+    enum: ['unclaimed', 'pending', 'approved', 'inactive'],
     default: 'pending',
   },
   emailVerified: {
@@ -62,11 +69,45 @@ const communityProfileSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // True once the member has been imported from the historical roster (vs. a
+  // fresh self-submission). Lets us tell "existing member, claimable" apart.
+  seeded: {
+    type: Boolean,
+    default: false,
+  },
+  // True once the person has accessed the profile via a magic link (proving
+  // ownership of the email on file).
+  claimed: {
+    type: Boolean,
+    default: false,
+  },
+  // GDPR consent to be listed publicly. Seeded members who did not consent stay
+  // hidden until they claim (which records consent).
+  gdprConsent: {
+    type: Boolean,
+    default: false,
+  },
   manageTokenHash: {
     type: String,
     default: null,
   },
   manageTokenExpiry: {
+    type: Date,
+    default: null,
+  },
+  // Self-service primary-email change: a new address that has been requested but
+  // not yet verified. Confirmed via a link sent to the new address.
+  pendingEmail: {
+    type: String,
+    lowercase: true,
+    trim: true,
+    default: null,
+  },
+  pendingEmailTokenHash: {
+    type: String,
+    default: null,
+  },
+  pendingEmailTokenExpiry: {
     type: Date,
     default: null,
   },

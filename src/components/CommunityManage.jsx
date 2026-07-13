@@ -7,11 +7,13 @@ import {
   ArrowRight,
   Check,
   AlertCircle,
-  X,
   Home,
   Loader2,
   Trash2,
   Save,
+  AtSign,
+  Clock,
+  UserPlus,
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
@@ -24,7 +26,35 @@ const inputClasses = (hasError) => `w-full px-4 py-3 rounded-xl border bg-white 
   hasError ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700'
 } focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`;
 
-// Step 1: no token — request a manage link by email
+const cardClasses = 'w-full max-w-md mx-auto p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl';
+
+// Entry screen (no token): claim/manage by email, or request to claim with a new email
+const ManageEntry = () => {
+  const [mode, setMode] = useState('link'); // 'link' | 'claim'
+
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <div className="flex gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-900 w-full mb-6">
+        {[['link', 'I have my email'], ['claim', 'Lost access']].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setMode(key)}
+            className={`flex-1 px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+              mode === key
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === 'link' ? <RequestLink /> : <ClaimRequestForm />}
+    </div>
+  );
+};
+
+// Claim/manage by the email on file → sends a magic link
 const RequestLink = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,17 +66,229 @@ const RequestLink = () => {
     if (!email || loading) return;
     setLoading(true);
     setError('');
-
     try {
       const response = await fetch(`${API_URL}/api/community/manage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      if (response.ok) {
-        setSent(true);
+      if (response.ok) setSent(true);
+      else setError('Something went wrong. Please try again.');
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onSubmit={handleSubmit} className={cardClasses}>
+      <div className="w-12 h-12 rounded-full bg-itc-green/10 flex items-center justify-center mx-auto mb-6">
+        <Mail className="w-5 h-5 text-itc-green" />
+      </div>
+      <h1 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-1">Claim or Manage Your Profile</h1>
+
+      {sent ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-4">
+          If a profile with <span className="font-medium text-slate-700 dark:text-slate-300">{email}</span> exists,
+          a secure link is on its way. Check your inbox — the link expires in 60 minutes.
+        </p>
+      ) : (
+        <>
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+            Enter the email you registered with and we'll send you a link to claim or edit your profile.
+          </p>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="mario@example.com"
+            autoFocus
+            className={inputClasses(false)}
+          />
+          {error && (
+            <p className="flex items-center gap-2 text-sm text-red-500 mt-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loading || !email}
+            className="w-full mt-6 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email Me a Link'}
+          </button>
+        </>
+      )}
+    </motion.form>
+  );
+};
+
+// Lost access to the registered email → request to take over with a new one (admin approves)
+const ClaimRequestForm = () => {
+  const [form, setForm] = useState({ fullName: '', currentEmail: '', newEmail: '', message: '' });
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+    setError('');
+    if (!form.fullName.trim() || !form.newEmail.trim()) {
+      setError('Your name and the new email are required.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/community/claim-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) setSent(true);
+      else setError(data.message || 'Something went wrong. Please try again.');
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`${cardClasses} text-center`}>
+        <div className="w-16 h-16 bg-itc-green/10 dark:bg-itc-green/20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Check className="w-8 h-8 text-itc-green" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Request received</h2>
+        <p className="text-slate-600 dark:text-slate-400 text-sm">
+          An admin will review your request. Once approved, you'll get an email at{' '}
+          <span className="font-medium text-slate-700 dark:text-slate-300">{form.newEmail}</span> to sign in.
+        </p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onSubmit={handleSubmit} className={cardClasses}>
+      <div className="w-12 h-12 rounded-full bg-itc-green/10 flex items-center justify-center mx-auto mb-6">
+        <UserPlus className="w-5 h-5 text-itc-green" />
+      </div>
+      <h1 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-1">Claim With a New Email</h1>
+      <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
+        No longer have access to the email on file? Request to take ownership with a new one — an admin will approve it.
+      </p>
+
+      <div className="space-y-3">
+        <input type="text" value={form.fullName} onChange={set('fullName')} placeholder="Your full name (as registered) *" className={inputClasses(false)} />
+        <input type="email" value={form.currentEmail} onChange={set('currentEmail')} placeholder="Old email on file (if you know it)" className={inputClasses(false)} />
+        <input type="email" value={form.newEmail} onChange={set('newEmail')} placeholder="New email you want to use *" className={inputClasses(false)} />
+        <textarea value={form.message} onChange={set('message')} rows={3} maxLength={1000} placeholder="Anything that helps us verify it's you (optional)" className={`${inputClasses(false)} resize-none`} />
+      </div>
+
+      {error && (
+        <p className="flex items-center gap-2 text-sm text-red-500 mt-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full mt-6 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Request'}
+      </button>
+    </motion.form>
+  );
+};
+
+// Confirm a pending primary-email change (arrived via emailToken link)
+const ConfirmEmailChange = ({ emailToken }) => {
+  const [state, setState] = useState('loading'); // 'loading' | 'ok' | 'error'
+  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/community/manage?emailToken=${encodeURIComponent(emailToken)}`);
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setEmail(data.email || '');
+          setState('ok');
+        } else {
+          setMessage(data.message || 'This confirmation link is invalid or has expired.');
+          setState('error');
+        }
+      } catch {
+        setMessage('Could not reach the server. Please try again.');
+        setState('error');
+      }
+    };
+    run();
+  }, [emailToken]);
+
+  if (state === 'loading') {
+    return (
+      <div className="flex items-center justify-center gap-3 text-slate-500 dark:text-slate-400 py-20">
+        <Loader2 className="w-5 h-5 animate-spin" /> Confirming your new email...
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${cardClasses} text-center`}>
+      <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${state === 'ok' ? 'bg-itc-green/10 dark:bg-itc-green/20' : 'bg-red-100 dark:bg-red-900/20'}`}>
+        {state === 'ok' ? <Check className="w-8 h-8 text-itc-green" /> : <AlertCircle className="w-8 h-8 text-red-500" />}
+      </div>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+        {state === 'ok' ? 'Email updated!' : 'Link invalid'}
+      </h2>
+      <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
+        {state === 'ok'
+          ? <>Your profile now uses <span className="font-medium text-slate-700 dark:text-slate-300">{email}</span> as its primary email.</>
+          : message}
+      </p>
+      <a
+        href="/community/manage"
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
+      >
+        Manage My Profile
+      </a>
+    </div>
+  );
+};
+
+// Change the primary email while signed in via a manage token
+const ChangeEmailSection = ({ token, currentEmail }) => {
+  const [open, setOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    if (!newEmail || loading) return;
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'change-email', newEmail }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setMessage(data.message || `Check ${newEmail} to confirm the change.`);
+        setNewEmail('');
       } else {
-        setError('Something went wrong. Please try again.');
+        setError(data.message || 'Something went wrong.');
       }
     } catch {
       setError('Could not reach the server. Please try again.');
@@ -56,57 +298,44 @@ const RequestLink = () => {
   };
 
   return (
-    <motion.form
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      onSubmit={handleSubmit}
-      className="w-full max-w-md mx-auto p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl"
-    >
-      <div className="w-12 h-12 rounded-full bg-itc-green/10 flex items-center justify-center mx-auto mb-6">
-        <Mail className="w-5 h-5 text-itc-green" />
-      </div>
-      <h1 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-1">Manage Your Profile</h1>
+    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between text-left">
+        <span className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+          <AtSign className="w-5 h-5 text-itc-green" /> Primary Email
+        </span>
+        <span className="text-sm text-slate-400">{open ? 'Cancel' : 'Change'}</span>
+      </button>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+        Currently <span className="font-medium text-slate-700 dark:text-slate-300">{currentEmail}</span> — never shown publicly.
+      </p>
 
-      {sent ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-4">
-          If a profile with <span className="font-medium text-slate-700 dark:text-slate-300">{email}</span> exists,
-          a manage link is on its way. Check your inbox — the link expires in 60 minutes.
-        </p>
-      ) : (
-        <>
-          <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
-            Enter the email you used for your profile and we'll send you an edit link.
-          </p>
-
+      {open && (
+        <div className="mt-4 space-y-3">
           <input
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="mario@example.com"
-            autoFocus
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="new-email@example.com"
             className={inputClasses(false)}
           />
-
-          {error && (
-            <p className="flex items-center gap-2 text-sm text-red-500 mt-3">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-            </p>
-          )}
-
+          <p className="text-xs text-slate-400">We'll send a confirmation link to the new address. It becomes your primary email only after you click it.</p>
+          {error && <p className="flex items-center gap-2 text-sm text-red-500"><AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}</p>}
+          {message && <p className="flex items-center gap-2 text-sm text-itc-green"><Check className="w-4 h-4 flex-shrink-0" /> {message}</p>}
           <button
-            type="submit"
-            disabled={loading || !email}
-            className="w-full mt-6 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            type="button"
+            onClick={submit}
+            disabled={loading || !newEmail}
+            className="px-5 py-2.5 rounded-full text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 flex items-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email Me a Manage Link'}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Confirmation'}
           </button>
-        </>
+        </div>
       )}
-    </motion.form>
+    </div>
   );
 };
 
-// Step 2: token present — edit or delete own profile
+// Token present — edit / delete / change-email of own profile
 const EditProfile = ({ token }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -125,11 +354,8 @@ const EditProfile = ({ token }) => {
       try {
         const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`);
         const data = await response.json();
-        if (response.ok && data.success) {
-          setProfile(data.profile);
-        } else {
-          setLoadError(data.message || 'This link is invalid or has expired.');
-        }
+        if (response.ok && data.success) setProfile(data.profile);
+        else setLoadError(data.message || 'This link is invalid or has expired.');
       } catch {
         setLoadError('Could not reach the server. Please try again.');
       } finally {
@@ -139,19 +365,13 @@ const EditProfile = ({ token }) => {
     load();
   }, [token]);
 
-  const set = (field) => (e) => setProfile(prev => ({ ...prev, [field]: e.target.value }));
+  const set = (field) => (e) => setProfile((prev) => ({ ...prev, [field]: e.target.value }));
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setPicError('Please upload an image file');
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      setPicError(`File size must be under ${MAX_FILE_SIZE_MB}MB`);
-      return;
-    }
+    if (!file.type.startsWith('image/')) { setPicError('Please upload an image file'); return; }
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) { setPicError(`File size must be under ${MAX_FILE_SIZE_MB}MB`); return; }
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -174,13 +394,14 @@ const EditProfile = ({ token }) => {
     setSaveError('');
     setSaving(true);
     try {
+      const linkedIn = (profile.linkedIn || '').trim();
       const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           firstName: profile.firstName,
           lastName: profile.lastName,
-          linkedIn: /^https?:\/\//i.test(profile.linkedIn.trim()) ? profile.linkedIn.trim() : `https://${profile.linkedIn.trim()}`,
+          linkedIn: linkedIn && !/^https?:\/\//i.test(linkedIn) ? `https://${linkedIn}` : linkedIn,
           profilePic: profile.profilePic,
           profession: profile.profession,
           company: profile.company,
@@ -188,9 +409,7 @@ const EditProfile = ({ token }) => {
         }),
       });
       const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to save');
-      }
+      if (!response.ok || !data.success) throw new Error(data.message || 'Failed to save');
       setDone('saved');
     } catch (error) {
       setSaveError(error.message || 'Something went wrong. Please try again.');
@@ -204,13 +423,9 @@ const EditProfile = ({ token }) => {
     setDeleting(true);
     setSaveError('');
     try {
-      const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
       const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to delete');
-      }
+      if (!response.ok || !data.success) throw new Error(data.message || 'Failed to delete');
       setDone('deleted');
     } catch (error) {
       setSaveError(error.message || 'Something went wrong. Please try again.');
@@ -229,7 +444,7 @@ const EditProfile = ({ token }) => {
 
   if (loadError) {
     return (
-      <div className="w-full max-w-md mx-auto p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center">
+      <div className={`${cardClasses} text-center`}>
         <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
         <p className="text-slate-600 dark:text-slate-400 mb-6">{loadError}</p>
         <a
@@ -244,7 +459,7 @@ const EditProfile = ({ token }) => {
 
   if (done) {
     return (
-      <div className="w-full max-w-md mx-auto p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center">
+      <div className={`${cardClasses} text-center`}>
         <div className="w-16 h-16 bg-itc-green/10 dark:bg-itc-green/20 rounded-full flex items-center justify-center mx-auto mb-6">
           <Check className="w-8 h-8 text-itc-green" />
         </div>
@@ -253,7 +468,9 @@ const EditProfile = ({ token }) => {
         </h2>
         <p className="text-slate-600 dark:text-slate-400 mb-6">
           {done === 'saved'
-            ? 'Your changes are live on the community page.'
+            ? (profile.status === 'pending'
+                ? 'Saved! Your profile will go live once our team approves it.'
+                : 'Your changes are live on the community page.')
             : 'Your profile has been removed. Ci vediamo, hopefully at an event!'}
         </p>
         <Link
@@ -267,17 +484,12 @@ const EditProfile = ({ token }) => {
   }
 
   return (
-    <motion.form
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      onSubmit={handleSave}
-      className="w-full max-w-2xl mx-auto space-y-6"
-    >
+    <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onSubmit={handleSave} className="w-full max-w-2xl mx-auto space-y-6">
       {showCropper && selectedFile && (
         <ImageCropper
           imageFile={selectedFile}
           onCropComplete={(cropped) => {
-            setProfile(prev => ({ ...prev, profilePic: cropped }));
+            setProfile((prev) => ({ ...prev, profilePic: cropped }));
             setShowCropper(false);
             setSelectedFile(null);
           }}
@@ -289,17 +501,19 @@ const EditProfile = ({ token }) => {
         />
       )}
 
+      {profile.status === 'pending' && (
+        <div className="flex items-start gap-2 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
+          <Clock className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <span>Your profile is awaiting admin approval. You can edit it now — it goes live once approved.</span>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Your Profile</h2>
 
-        {/* Photo */}
         <div className="flex items-center gap-6 mb-6">
           {profile.profilePic ? (
-            <img
-              src={profile.profilePic}
-              alt="Profile"
-              className="w-24 h-24 object-cover rounded-2xl border-4 border-itc-green/20"
-            />
+            <img src={profile.profilePic} alt="Profile" className="w-24 h-24 object-cover rounded-2xl border-4 border-itc-green/20" />
           ) : (
             <div className="w-24 h-24 rounded-2xl border-4 border-itc-green/20 bg-gradient-to-br from-itc-green to-emerald-700 flex items-center justify-center">
               <span className="text-2xl font-bold text-white">
@@ -328,8 +542,8 @@ const EditProfile = ({ token }) => {
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">LinkedIn Profile *</label>
-          <input type="text" required value={profile.linkedIn} onChange={set('linkedIn')} className={inputClasses(false)} />
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">LinkedIn Profile</label>
+          <input type="text" value={profile.linkedIn || ''} onChange={set('linkedIn')} placeholder="linkedin.com/in/yourprofile" className={inputClasses(false)} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -345,16 +559,12 @@ const EditProfile = ({ token }) => {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Bio</label>
-          <textarea
-            value={profile.bio}
-            onChange={set('bio')}
-            rows={4}
-            maxLength={500}
-            className={`${inputClasses(false)} resize-none`}
-          />
+          <textarea value={profile.bio} onChange={set('bio')} rows={4} maxLength={500} className={`${inputClasses(false)} resize-none`} />
           <p className="text-xs text-slate-400 text-right mt-1">{(profile.bio || '').length}/500</p>
         </div>
       </div>
+
+      <ChangeEmailSection token={token} currentEmail={profile.email} />
 
       {saveError && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-start gap-2">
@@ -389,18 +599,19 @@ const EditProfile = ({ token }) => {
 };
 
 const CommunityManage = () => {
-  const [token] = useState(() => new URLSearchParams(window.location.search).get('token'));
+  const [params] = useState(() => new URLSearchParams(window.location.search));
+  const token = params.get('token');
+  const emailToken = params.get('emailToken');
 
-  // Strip the token from the URL bar (kept in state for API calls)
+  // Strip tokens from the URL bar (kept in state for API calls)
   useEffect(() => {
-    if (token) {
+    if (token || emailToken) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [token]);
+  }, [token, emailToken]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors duration-300">
-      {/* Top Controls */}
       <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-20">
         <Link
           to="/"
@@ -411,14 +622,17 @@ const CommunityManage = () => {
         <ThemeToggle className="shadow-sm hover:shadow-md" />
       </div>
 
-      {/* Background Effects */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] bg-itc-green/8 dark:bg-itc-green/10 rounded-full blur-3xl" />
         <div className="absolute top-1/3 -right-40 w-[40rem] h-[40rem] bg-itc-red/8 dark:bg-itc-red/10 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto px-4 pt-28 pb-16 flex flex-col justify-center min-h-screen">
-        {token ? <EditProfile token={token} /> : <RequestLink />}
+        {emailToken
+          ? <ConfirmEmailChange emailToken={emailToken} />
+          : token
+            ? <EditProfile token={token} />
+            : <ManageEntry />}
       </div>
     </div>
   );

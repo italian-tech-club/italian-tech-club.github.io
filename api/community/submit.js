@@ -26,16 +26,22 @@ const communityProfileSchema = new mongoose.Schema({
   firstName: { type: String, required: true, trim: true, maxlength: 50 },
   lastName: { type: String, required: true, trim: true, maxlength: 50 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  linkedIn: { type: String, required: true, trim: true },
-  profilePic: { type: String, required: function () { return !this.isFounder; }, default: null },
+  linkedIn: { type: String, trim: true, default: '' },
+  profilePic: { type: String, default: null },
   profession: { type: String, required: true, trim: true, maxlength: 100 },
   company: { type: String, trim: true, maxlength: 100, default: '' },
   bio: { type: String, maxlength: 500, default: '' },
-  status: { type: String, enum: ['pending', 'approved', 'inactive'], default: 'pending' },
+  status: { type: String, enum: ['unclaimed', 'pending', 'approved', 'inactive'], default: 'pending' },
   emailVerified: { type: Boolean, default: false },
   isFounder: { type: Boolean, default: false },
+  seeded: { type: Boolean, default: false },
+  claimed: { type: Boolean, default: false },
+  gdprConsent: { type: Boolean, default: false },
   manageTokenHash: { type: String, default: null },
   manageTokenExpiry: { type: Date, default: null },
+  pendingEmail: { type: String, lowercase: true, trim: true, default: null },
+  pendingEmailTokenHash: { type: String, default: null },
+  pendingEmailTokenExpiry: { type: Date, default: null },
 }, {
   timestamps: true,
   collection: 'community_profiles',
@@ -58,8 +64,8 @@ async function sendVerifyEmail(email, token, firstName) {
   const link = `${SITE_URL}/community/manage?token=${token}`;
   const html = `
     <h2>Verify your profile — Italian Tech Club NYC</h2>
-    <p>Ciao ${firstName}! Click the link below to verify your email and publish your community profile. The link expires in 60 minutes.</p>
-    <p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#0f172a;color:#ffffff;border-radius:9999px;text-decoration:none;font-weight:bold;">Verify &amp; Publish My Profile</a></p>
+    <p>Ciao ${firstName}! Click the link below to verify your email. Your profile will go live once our team approves it. The link expires in 60 minutes.</p>
+    <p><a href="${link}" style="display:inline-block;padding:12px 24px;background:#0f172a;color:#ffffff;border-radius:9999px;text-decoration:none;font-weight:bold;">Verify My Email</a></p>
     <p style="color:#64748b;font-size:12px;">If the button doesn't work, copy this URL: ${link}</p>
     <p style="color:#64748b;font-size:12px;">If you didn't create this profile, you can safely ignore this email.</p>
   `;
@@ -149,8 +155,8 @@ export default async function handler(req, res) {
     return res.status(201).json({
       success: true,
       message: emailSent
-        ? 'Almost done! Check your email to verify and publish your profile.'
-        : 'Profile submitted! It will appear once approved.',
+        ? 'Profile submitted! Verify your email, then our team will review and approve it.'
+        : 'Profile submitted! It will appear once our team approves it.',
       emailSent,
       profileId: profile._id,
     });

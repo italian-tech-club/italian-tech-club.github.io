@@ -3,15 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../context/ThemeContext';
-import { COMMUNITY_ENABLED } from '../config';
+import { MEMBER_FORM_URL } from '../config';
 import { EASE } from '../lib/motion';
 
-const NAV_ITEMS = ['Who we are', 'What we do', 'Events', 'Team', ...(COMMUNITY_ENABLED ? ['Community'] : []), 'Sponsor'];
+const BASE_NAV_ITEMS = ['Who we are', 'What we do', 'Events', 'Team'];
 
-const MEMBER_FORM_URL = 'https://www.gomry.com/form/Italian-Tech-Club-General-application-form-68uJSn7PbLmevuO2T0c5';
-
-const Navbar = () => {
+const Navbar = ({ preview = false }) => {
   const { theme } = useTheme();
+  const NAV_ITEMS = [...BASE_NAV_ITEMS, ...(preview ? ['Community'] : []), 'Sponsor'];
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 

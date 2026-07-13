@@ -22,10 +22,11 @@ import CommunityTeaser from './components/CommunityTeaser';
 import Community from './components/Community';
 import CommunityJoin from './components/CommunityJoin';
 import CommunityManage from './components/CommunityManage';
-import { COMMUNITY_ENABLED } from './config';
 
-// Homepage component with all sections
-const HomePage = () => {
+// Homepage component with all sections.
+// `preview` surfaces experimental features (community teaser + nav link) that
+// stay hidden on the public homepage — reached via the unadvertised /preview URL.
+const HomePage = ({ preview = false }) => {
   useEffect(() => {
     // Handle hash navigation on load
     if (window.location.hash) {
@@ -41,14 +42,14 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 selection:bg-itc-green selection:text-white transition-colors duration-300">
-      <Navbar />
+      <Navbar preview={preview} />
       <main>
         <Hero />
         <About />
         <Activities />
         <Events />
         <Team />
-        {COMMUNITY_ENABLED && <CommunityTeaser />}
+        {preview && <CommunityTeaser />}
         <Sponsor />
         <Contact />
       </main>
@@ -68,19 +69,18 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      {/* Unadvertised preview of the homepage with experimental features on */}
+      <Route path="/preview" element={<HomePage preview />} />
       <Route path="/cofounder-matching" element={<CoFounderMatching />} />
       <Route path="/cofounders" element={<CoFounderProfiles />} />
       <Route path="/whatsapp" element={<WhatsAppRedirect />} />
       <Route path="/qr" element={<WhatsAppQR />} />
       <Route path="/matching-qr" element={<MatchingQR />} />
       <Route path="/events" element={<AllEvents />} />
-      {COMMUNITY_ENABLED && (
-        <>
-          <Route path="/community" element={<Community />} />
-          <Route path="/community/join" element={<CommunityJoin />} />
-          <Route path="/community/manage" element={<CommunityManage />} />
-        </>
-      )}
+      {/* Community pages are always routed but unlinked from the public homepage */}
+      <Route path="/community" element={<Community />} />
+      <Route path="/community/join" element={<CommunityJoin />} />
+      <Route path="/community/manage" element={<CommunityManage />} />
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/admin" element={<AdminEvents />} />
       <Route path="*" element={<NotFound />} />

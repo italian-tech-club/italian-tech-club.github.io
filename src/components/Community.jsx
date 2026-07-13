@@ -102,18 +102,20 @@ const ProfileModal = ({ profile, index, onClose }) => {
           )}
         </div>
 
-        <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-          <a
-            href={profile.linkedIn}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
-          >
-            <Linkedin className="w-5 h-5" />
-            Connect on LinkedIn
-            <ExternalLink className="w-4 h-4 ml-1 hidden sm:block" />
-          </a>
-        </div>
+        {profile.linkedIn && (
+          <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+            <a
+              href={profile.linkedIn}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-medium hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors"
+            >
+              <Linkedin className="w-5 h-5" />
+              Connect on LinkedIn
+              <ExternalLink className="w-4 h-4 ml-1 hidden sm:block" />
+            </a>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -162,9 +164,11 @@ const ProfileCard = ({ profile, onClick, index = 0 }) => (
       {profile.bio ? (
         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2 pr-2">{profile.bio}</p>
       ) : <div />}
-      <span className="flex items-center gap-1 text-itc-green text-xs sm:text-sm font-medium flex-shrink-0">
-        <Linkedin className="w-4 h-4" />
-      </span>
+      {profile.linkedIn && (
+        <span className="flex items-center gap-1 text-itc-green text-xs sm:text-sm font-medium flex-shrink-0">
+          <Linkedin className="w-4 h-4" />
+        </span>
+      )}
     </div>
   </motion.div>
 );
@@ -253,17 +257,22 @@ const Community = () => {
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto px-4">
             The innovators, founders, investors, and engineers of the Italian Tech Club NYC. Create your profile and connect with fellow members.
           </p>
-          <Link
-            to="/community/join"
-            className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-          >
-            Create Your Profile <ArrowRight className="w-4 h-4" />
-          </Link>
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-            Already have a profile?{' '}
-            <Link to="/community/manage" className="text-itc-green font-medium hover:underline">
-              Edit or remove it
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              to="/community/manage"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+            >
+              Claim Your Profile <ArrowRight className="w-4 h-4" />
             </Link>
+            <Link
+              to="/community/join"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:border-itc-green hover:text-itc-green transition-all"
+            >
+              New here? Apply to Join
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
+            Already a member? Claim your profile with the email you registered with — or request a new one if you've lost access.
           </p>
         </motion.div>
 
@@ -329,15 +338,23 @@ const Community = () => {
           <div className="bg-gradient-to-r from-itc-green/10 via-white to-itc-red/10 dark:via-slate-900 rounded-3xl p-6 sm:p-10 border border-slate-100 dark:border-slate-800">
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-3">You're part of this community too</h3>
             <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto text-sm sm:text-base">
-              Add your profile so other members can find you and connect on LinkedIn.
+              Already a member? Claim your profile to edit it and connect on LinkedIn. New to the club? Apply to join.
             </p>
-            <Link
-              to="/community/join"
-              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
-            >
-              Create Your Profile
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                to="/community/manage"
+                className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+              >
+                Claim Your Profile
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                to="/community/join"
+                className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:border-itc-green hover:text-itc-green transition-all"
+              >
+                Apply to Join
+              </Link>
+            </div>
           </div>
         </motion.div>
       </div>

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { fileToResizedDataUrl } from '../utils/image';
 import AdminInquiries from './AdminInquiries';
+import AdminCommunity from './AdminCommunity';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 const STORAGE_KEY = 'itc_admin_session';
@@ -561,7 +562,9 @@ const AdminEvents = () => {
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {tab === 'events'
                 ? `${events.length} event${events.length === 1 ? '' : 's'} in the database`
-                : 'Sponsorship inquiries sent from the website'}
+                : tab === 'inquiries'
+                  ? 'Sponsorship inquiries sent from the website'
+                  : 'Approve new members and email-claim requests'}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -585,7 +588,7 @@ const AdminEvents = () => {
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-900 w-fit mb-8">
-          {[['events', 'Events'], ['inquiries', 'Inquiries']].map(([key, label]) => (
+          {[['events', 'Events'], ['inquiries', 'Inquiries'], ['community', 'Community']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -602,6 +605,10 @@ const AdminEvents = () => {
 
         {tab === 'inquiries' && (
           <AdminInquiries authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
+        )}
+
+        {tab === 'community' && (
+          <AdminCommunity authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
         )}
 
         {tab === 'events' && loading && (

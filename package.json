@@ -10,7 +10,8 @@
     "server": "node server/index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "migrate:events": "node scripts/migrate-events.js",
-    "seed:founders": "node scripts/seed-founders.js"
+    "seed:founders": "node scripts/seed-founders.js",
+    "seed:community": "node scripts/seed-community.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

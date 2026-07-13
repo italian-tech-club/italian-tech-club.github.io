@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
+import { MEMBER_FORM_URL } from '../config';
 
 const PROFILE_PIC_SIZE = 400;
 const MAX_FILE_SIZE_MB = 5;
@@ -194,8 +195,14 @@ const CommunityJoin = () => {
             <Check className="w-10 h-10 text-itc-green" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Almost There! 📬</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-8">
-            Check your email — we sent you a verification link. Click it to publish your profile on the community page.
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            Check your email and click the verification link. Our team then reviews your profile — you'll go live once it's approved.
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">
+            Haven't filled the membership application yet?{' '}
+            <a href={MEMBER_FORM_URL} target="_blank" rel="noopener noreferrer" className="text-itc-green font-medium hover:underline">
+              Complete it here
+            </a>{' '}— it speeds up approval.
           </p>
           <Link
             to="/community"
@@ -260,6 +267,29 @@ const CommunityJoin = () => {
           <motion.p variants={item} className="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
             Create your member profile so others in the Italian Tech Club can find you and connect on LinkedIn.
           </motion.p>
+
+          <motion.div variants={item} className="mt-8 max-w-xl mx-auto text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <p className="text-sm font-bold text-slate-900 dark:text-white mb-3">How joining works</p>
+            <ol className="space-y-2 text-sm text-slate-600 dark:text-slate-400 list-decimal list-inside">
+              <li>Complete the ITC membership application form.</li>
+              <li>Create your profile below and verify your email.</li>
+              <li>Our team reviews and approves — then you're live.</li>
+            </ol>
+            <a
+              href={MEMBER_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-itc-green text-white text-sm font-semibold hover:bg-itc-red transition-colors"
+            >
+              Open Membership Form <ArrowRight className="w-4 h-4" />
+            </a>
+            <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+              Already a member?{' '}
+              <Link to="/community/manage" className="text-itc-green font-medium hover:underline">
+                Claim your existing profile
+              </Link>{' '}instead.
+            </p>
+          </motion.div>
         </motion.div>
 
         {/* Form */}
