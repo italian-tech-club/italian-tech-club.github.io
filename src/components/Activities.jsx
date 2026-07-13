@@ -1,18 +1,19 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Users2, TrendingUp } from 'lucide-react';
+import { fadeRise, staggerContainer, hoverSpring, VIEWPORT } from '../lib/motion';
+import SectionEyebrow from './SectionEyebrow';
 
-const ActivityCard = ({ icon: Icon, title, description, colorClass, delay }) => (
+const ActivityCard = ({ icon: Icon, title, description, accentClass, iconClass }) => (
   <motion.div
-    initial={{ opacity: 0, y: 30 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true }}
-    transition={{ duration: 0.5, delay }}
-    className="relative group rounded-3xl p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-transparent hover:shadow-2xl transition-shadow transition-colors duration-300"
+    variants={fadeRise}
+    whileHover={{ y: -5, transition: hoverSpring }}
+    className="relative group rounded-3xl p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:shadow-2xl hover:shadow-slate-900/10 dark:hover:shadow-black/40 transition-[border-color,box-shadow] duration-300 ease-out-quint overflow-hidden"
   >
-    <div className={`absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-5 transition-opacity duration-300 ${colorClass}`} />
+    {/* Accent line that slides in on hover */}
+    <div className={`absolute top-0 left-0 right-0 h-1 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500 ease-out-quint ${accentClass}`} />
     <div className="relative z-10">
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${colorClass} bg-opacity-10 dark:bg-opacity-20 text-slate-900 dark:text-white`}>
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-105 transition-transform duration-300 ease-out-quint ${iconClass}`}>
         <Icon className="w-7 h-7" />
       </div>
       <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">{title}</h3>
@@ -27,40 +28,52 @@ const Activities = () => {
   return (
     <section id="what-we-do" className="py-24 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        <motion.div
+          variants={fadeRise}
+          initial="hidden"
+          whileInView="show"
+          viewport={VIEWPORT}
+          className="text-center max-w-3xl mx-auto mb-16"
+        >
+          <SectionEyebrow className="mb-4">Our three pillars</SectionEyebrow>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">What We Do</h2>
           <p className="text-lg text-slate-600 dark:text-slate-400">
             We foster a vibrant ecosystem through three key pillars designed to support your professional journey.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <motion.div
+          variants={staggerContainer(0.12)}
+          initial="hidden"
+          whileInView="show"
+          viewport={VIEWPORT}
+          className="grid md:grid-cols-3 gap-8"
+        >
           <ActivityCard
             icon={MessageCircle}
             title="Connect"
             description="Discover other professionals who live abroad and connect with them through our exclusive digital community in an informal setting."
-            colorClass="bg-itc-green"
-            delay={0.1}
+            accentClass="bg-itc-green"
+            iconClass="bg-itc-green/10 text-itc-green"
           />
           <ActivityCard
             icon={Users2}
             title="Meet"
             description="Bond with fellow professionals in our networking events. We organize monthly dining events and meetups in the heart of NYC."
-            colorClass="bg-slate-900 dark:bg-white"
-            delay={0.2}
+            accentClass="bg-slate-900 dark:bg-white"
+            iconClass="bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white"
           />
           <ActivityCard
             icon={TrendingUp}
             title="Grow"
             description="Unlock a wealth of knowledge and connections. We foster the community through mentoring activities and shared opportunities."
-            colorClass="bg-itc-red"
-            delay={0.3}
+            accentClass="bg-itc-red"
+            iconClass="bg-itc-red/10 text-itc-red"
           />
-        </div>
+        </motion.div>
       </div>
     </section>
   );
 };
 
 export default Activities;
-

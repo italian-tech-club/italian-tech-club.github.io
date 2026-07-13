@@ -8,7 +8,25 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 font-sans transition-colors duration-300 dark:bg-slate-950 dark:text-slate-50;
+    @apply bg-slate-50 text-slate-900 font-sans transition-colors duration-300 dark:bg-slate-950 dark:text-slate-50 antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-itc-green/60 ring-offset-2 ring-offset-white dark:ring-offset-slate-950 rounded-sm;
+  }
+}
+
+@layer utilities {
+  /* Subtle dot-grid texture (color via currentColor) */
+  .bg-dot-grid {
+    background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* Fade a layer out towards its edges */
+  .mask-fade-edges {
+    -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 40%, black 25%, transparent 72%);
+    mask-image: radial-gradient(ellipse 70% 65% at 50% 40%, black 25%, transparent 72%);
   }
 }
 
@@ -48,7 +66,24 @@
 
 .animate-bounce-slow {
   animation: bounce-slow 2s ease-in-out infinite;
-}.animation-delay-1000 { animation-delay: 1s; }
+}
+
+.animation-delay-1000 { animation-delay: 1s; }
 .animation-delay-2000 { animation-delay: 2s; }
 .animation-delay-3000 { animation-delay: 3s; }
 .animation-delay-4000 { animation-delay: 4s; }
+
+/* Respect users who prefer less motion: kill CSS loops and smooth scrolling.
+   Framer Motion reveals are handled by MotionConfig reducedMotion="user". */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -37,12 +37,12 @@ const Footer = () => {
             <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-6">Our Chapters</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-4 gap-x-8">
               {chapters.map((city) => (
-                <a 
+                <a
                   key={city.name}
                   href={city.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-center gap-2 text-sm hover:text-white transition-colors"
+                  className="group flex items-center gap-2 text-sm hover:text-white hover:translate-x-0.5 transition-[color,transform] duration-300 ease-out-quint"
                 >
                   <span className="text-base filter grayscale group-hover:grayscale-0 transition-all duration-300">{city.flag}</span>
                   <span>{city.name}</span>

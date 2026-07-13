@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, ArrowRight, CalendarCheck, Clock, Image as ImageIcon, X, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import eventsData from '../data/events.json';
+import { EASE, fadeRise, hoverSpring, VIEWPORT } from '../lib/motion';
+import SectionEyebrow from './SectionEyebrow';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -59,9 +61,10 @@ const GalleryModal = ({ event, onClose }) => {
         <AnimatePresence mode="wait">
           {images.length > 0 && <motion.img
             key={currentIndex}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, scale: 0.985 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.985 }}
+            transition={{ duration: 0.3, ease: EASE }}
             src={images[currentIndex]}
             alt={`Gallery image ${currentIndex + 1}`}
             className="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl"
@@ -115,13 +118,14 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
-      transition={{ delay, duration: 0.8, ease: "easeOut" }}
-      className={`flex flex-col md:flex-row gap-6 items-start md:items-center p-6 rounded-2xl border transition-all duration-300 group relative overflow-hidden ${
-        isPast 
-          ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800' 
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ delay, duration: 0.55, ease: EASE }}
+      whileHover={isPast ? undefined : { y: -3, transition: hoverSpring }}
+      className={`flex flex-col md:flex-row gap-6 items-start md:items-center p-6 rounded-2xl border transition-[border-color,box-shadow,background-color] duration-300 ease-out-quint group relative overflow-hidden ${
+        isPast
+          ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800'
           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-itc-green/30 dark:hover:border-itc-green/30'
       }`}
     >
@@ -336,27 +340,21 @@ const Events = ({ showAll = false }) => {
       </AnimatePresence>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
-          <div>
-            <motion.h2 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4"
-            >
+          <motion.div
+            variants={fadeRise}
+            initial="hidden"
+            whileInView="show"
+            viewport={VIEWPORT}
+          >
+            <SectionEyebrow className="mb-4">Where we gather</SectionEyebrow>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
                 Events
-            </motion.h2>
-            <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
-                className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl"
-            >
-              Join our exclusive gatherings in the heart of New York City. 
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl">
+              Join our exclusive gatherings in the heart of New York City.
               Connect with fellow Italian innovators over tech talks, aperitivos, and dinners.
-            </motion.p>
-          </div>
+            </p>
+          </motion.div>
         </div>
 
         <div className="space-y-6">
