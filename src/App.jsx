@@ -22,6 +22,7 @@ import CommunityTeaser from './components/CommunityTeaser';
 import Community from './components/Community';
 import CommunityJoin from './components/CommunityJoin';
 import CommunityManage from './components/CommunityManage';
+import CommunityConnect from './components/CommunityConnect';
 
 // Homepage component with all sections.
 // `preview` surfaces experimental features (community teaser + nav link) that
@@ -81,6 +82,7 @@ function App() {
       <Route path="/community" element={<Community />} />
       <Route path="/community/join" element={<CommunityJoin />} />
       <Route path="/community/manage" element={<CommunityManage />} />
+      <Route path="/community/connect" element={<CommunityConnect />} />
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/admin" element={<AdminEvents />} />
       <Route path="*" element={<NotFound />} />

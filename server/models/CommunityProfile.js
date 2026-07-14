@@ -1,5 +1,12 @@
 import mongoose from 'mongoose';
 
+// Self-described roles a member can pick (multi-select). Distinct from
+// isFounder, which marks the ITC founding team.
+export const ROLE_OPTIONS = ['founder', 'engineer', 'investor', 'innovator', 'tech-enthusiast', 'researcher'];
+// What a member is currently looking for — powers directory filters and the
+// anonymized "looking for" teaser shown to non-members.
+export const LOOKING_FOR_OPTIONS = ['cofounder', 'hiring', 'job', 'investors', 'beta-users', 'mentor'];
+
 const communityProfileSchema = new mongoose.Schema({
   firstName: {
     type: String,
@@ -51,6 +58,41 @@ const communityProfileSchema = new mongoose.Schema({
     type: String,
     maxlength: 500,
     default: '',
+  },
+  roles: {
+    type: [String],
+    enum: ROLE_OPTIONS,
+    default: [],
+  },
+  lookingFor: {
+    type: [String],
+    enum: LOOKING_FOR_OPTIONS,
+    default: [],
+  },
+  // Whether other members may send this member a connect request.
+  openToConnect: {
+    type: Boolean,
+    default: true,
+  },
+  // Sequential "Member #N", assigned once on approval (see Counter model).
+  memberNumber: {
+    type: Number,
+    default: null,
+  },
+  // Total profile-detail views by other members (deduped per viewer per day).
+  viewCount: {
+    type: Number,
+    default: 0,
+  },
+  // Personal referral code for /community/join?ref=<code>.
+  inviteCode: {
+    type: String,
+    default: null,
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityProfile',
+    default: null,
   },
   status: {
     type: String,
@@ -117,6 +159,9 @@ const communityProfileSchema = new mongoose.Schema({
 });
 
 communityProfileSchema.index({ status: 1 });
+// Partial (not sparse) so the default nulls don't collide on uniqueness.
+communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterExpression: { memberNumber: { $type: 'number' } } });
+communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
 
 const CommunityProfile = mongoose.model('CommunityProfile', communityProfileSchema);
 

@@ -12,10 +12,12 @@ import {
   Image as ImageIcon,
   Home,
   Briefcase,
+  Sparkles,
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
 import { MEMBER_FORM_URL } from '../config';
+import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
 
 const PROFILE_PIC_SIZE = 400;
 const MAX_FILE_SIZE_MB = 5;
@@ -43,9 +45,13 @@ const CommunityJoin = () => {
     profession: '',
     company: '',
     bio: '',
+    roles: [],
+    lookingFor: [],
     profilePic: null,
     profilePicPreview: null,
   });
+  // Referral code from an invite link (/community/join?ref=<code>)
+  const [refCode] = useState(() => new URLSearchParams(window.location.search).get('ref') || '');
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,6 +66,14 @@ const CommunityJoin = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
   };
+
+  const toggleIn = (field) => (value) => setFormData(prev => {
+    const current = prev[field];
+    return {
+      ...prev,
+      [field]: current.includes(value) ? current.filter(v => v !== value) : [...current, value],
+    };
+  });
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -156,6 +170,9 @@ const CommunityJoin = () => {
         profession: formData.profession,
         company: formData.company,
         bio: formData.bio,
+        roles: formData.roles,
+        lookingFor: formData.lookingFor,
+        ...(refCode ? { ref: refCode } : {}),
       };
 
       const response = await fetch(`${API_URL}/api/community/submit`, {
@@ -267,6 +284,12 @@ const CommunityJoin = () => {
           <motion.p variants={item} className="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
             Create your member profile so others in the Italian Tech Club can find you and connect on LinkedIn.
           </motion.p>
+
+          {refCode && (
+            <motion.div variants={item} className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-itc-green/10 border border-itc-green/20 text-itc-green text-sm font-medium">
+              <Check className="w-4 h-4" /> You've been invited by a member — your application is fast-tracked.
+            </motion.div>
+          )}
 
           <motion.div variants={item} className="mt-8 max-w-xl mx-auto text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
             <p className="text-sm font-bold text-slate-900 dark:text-white mb-3">How joining works</p>
@@ -462,6 +485,63 @@ const CommunityJoin = () => {
               <p className="text-xs text-slate-400 text-right mt-1">
                 {formData.bio.length}/500
               </p>
+            </div>
+          </motion.div>
+
+          {/* Community Signals */}
+          <motion.div variants={item} className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-itc-green" />
+              Community Signals
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+              Optional, but this is how members find each other — pick what fits and what you're after.
+            </p>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">I am a...</label>
+              <div className="flex flex-wrap gap-2">
+                {ROLE_OPTIONS.map((option) => {
+                  const active = formData.roles.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleIn('roles')(option.value)}
+                      className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
+                        active
+                          ? 'bg-itc-green text-white border-itc-green'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-itc-green hover:text-itc-green'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">I'm looking for...</label>
+              <div className="flex flex-wrap gap-2">
+                {LOOKING_FOR_OPTIONS.map((option) => {
+                  const active = formData.lookingFor.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleIn('lookingFor')(option.value)}
+                      className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
+                        active
+                          ? 'bg-itc-green text-white border-itc-green'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-itc-green hover:text-itc-green'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </motion.div>
 

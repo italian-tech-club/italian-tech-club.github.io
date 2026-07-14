@@ -3,13 +3,22 @@ import crypto from 'crypto';
 import CommunityProfile from '../models/CommunityProfile.js';
 import EmailClaimRequest from '../models/EmailClaimRequest.js';
 import { AdminSession } from '../models/AdminAuth.js';
+import { MemberSession } from '../models/MemberAuth.js';
+import { ConnectRequest } from '../models/ConnectRequest.js';
+import { ProfileView } from '../models/ProfileView.js';
+import { nextSequence } from '../models/Counter.js';
 import { sendEmail, magicLinkHtml, SITE_URL } from '../utils/email.js';
 
 const router = express.Router();
 
 const MANAGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
 const EMAIL_CHANGE_TTL_MS = 60 * 60 * 1000; // 60 minutes
-const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio'];
+const MEMBER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MAX_PENDING_CONNECTS = 3; // outgoing pending requests per member
+const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect'];
+// Fields members see about each other in the directory.
+const MEMBER_VIEW_FIELDS = 'firstName lastName linkedIn profilePic profession company bio isFounder roles lookingFor openToConnect memberNumber createdAt';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -21,6 +30,57 @@ async function findProfileByToken(token) {
     manageTokenExpiry: { $gt: new Date() },
   });
 }
+
+// Resolve the member session from the Authorization header. Only approved
+// profiles count as "inside" — a pending applicant's session (if any) doesn't
+// unlock the directory.
+async function findMemberSession(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) return null;
+  const session = await MemberSession.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date() } });
+  if (!session) return null;
+  const profile = await CommunityProfile.findById(session.profileId);
+  if (!profile || profile.status !== 'approved') return null;
+  return { session, profile };
+}
+
+// Approved members get a sequential member number and an invite code, assigned
+// once (on approval, claim, or first sign-in after this feature shipped).
+async function ensureMemberExtras(profile) {
+  if (profile.status !== 'approved') return;
+  let changed = false;
+  if (profile.memberNumber == null) {
+    profile.memberNumber = await nextSequence('memberNumber');
+    changed = true;
+  }
+  if (!profile.inviteCode) {
+    profile.inviteCode = crypto.randomBytes(6).toString('base64url');
+    changed = true;
+  }
+  if (changed) await profile.save();
+}
+
+async function createMemberSession(profile) {
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + MEMBER_SESSION_TTL_MS);
+  await MemberSession.create({
+    tokenHash: sha256(sessionToken),
+    profileId: profile._id,
+    email: profile.email,
+    expiresAt,
+  });
+  return { sessionToken, expiresAt };
+}
+
+const memberSummary = (profile) => ({
+  profileId: profile._id,
+  firstName: profile.firstName,
+  lastName: profile.lastName,
+  profilePic: profile.profilePic,
+  isFounder: profile.isFounder,
+  memberNumber: profile.memberNumber,
+});
 
 async function isAuthorized(req) {
   const header = req.headers.authorization || '';
@@ -64,7 +124,7 @@ async function applyClaim(profile) {
  */
 router.post('/submit', async (req, res) => {
   try {
-    const { firstName, lastName, email, linkedIn, profilePic, profession, company, bio } = req.body;
+    const { firstName, lastName, email, linkedIn, profilePic, profession, company, bio, roles, lookingFor, ref } = req.body;
 
     if (!firstName || !lastName || !email || !linkedIn || !profilePic || !profession) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -78,6 +138,14 @@ router.post('/submit', async (req, res) => {
       });
     }
 
+    // Referral: an invite link (/community/join?ref=<code>) ties the applicant
+    // to the inviting member — surfaced to admins for faster approval.
+    let referredBy = null;
+    if (ref && typeof ref === 'string') {
+      const inviter = await CommunityProfile.findOne({ inviteCode: ref.trim(), status: 'approved' }).select('_id');
+      referredBy = inviter?._id || null;
+    }
+
     const verifyToken = crypto.randomBytes(32).toString('hex');
 
     const profile = new CommunityProfile({
@@ -89,6 +157,9 @@ router.post('/submit', async (req, res) => {
       profession: profession.trim(),
       company: company?.trim() || '',
       bio: bio?.trim() || '',
+      roles: Array.isArray(roles) ? roles : [],
+      lookingFor: Array.isArray(lookingFor) ? lookingFor : [],
+      referredBy,
       status: 'pending',
       manageTokenHash: sha256(verifyToken),
       manageTokenExpiry: new Date(Date.now() + MANAGE_TOKEN_TTL_MS),
@@ -133,17 +204,76 @@ router.post('/submit', async (req, res) => {
 });
 
 /**
- * GET /api/community/profiles — public list (approved only, no emails)
+ * GET /api/community/profiles
+ *  - member session → full directory (roles, lookingFor, member numbers, ids)
+ *  - anonymous     → aggregate stats + anonymized teaser (founders stay visible
+ *                    as the public face; other members are first name + initial,
+ *                    no photos, no links)
  */
 router.get('/profiles', async (req, res) => {
   try {
+    const member = await findMemberSession(req);
+
+    if (member) {
+      const profiles = await CommunityProfile.find({ status: 'approved' })
+        .select(MEMBER_VIEW_FIELDS)
+        .sort({ createdAt: -1 });
+      return res.json({
+        success: true,
+        memberView: true,
+        viewer: memberSummary(member.profile),
+        profiles,
+        count: profiles.length,
+      });
+    }
+
     const profiles = await CommunityProfile.find({ status: 'approved' })
-      .select('firstName lastName linkedIn profilePic profession company bio isFounder createdAt')
-      .sort({ createdAt: -1 });
-    res.json({ success: true, profiles, count: profiles.length });
+      .select('firstName lastName profilePic profession isFounder roles lookingFor createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const stats = { total: profiles.length, founders: 0, roles: {}, lookingFor: {} };
+    for (const p of profiles) {
+      if (p.isFounder) stats.founders += 1;
+      for (const r of p.roles || []) stats.roles[r] = (stats.roles[r] || 0) + 1;
+      for (const l of p.lookingFor || []) stats.lookingFor[l] = (stats.lookingFor[l] || 0) + 1;
+    }
+
+    const teaser = profiles.map((p) => p.isFounder
+      ? { firstName: p.firstName, lastName: p.lastName, profilePic: p.profilePic, profession: p.profession, isFounder: true, createdAt: p.createdAt }
+      : { firstName: p.firstName, lastInitial: p.lastName?.[0] || '', profession: p.profession, lookingFor: p.lookingFor || [], isFounder: false, createdAt: p.createdAt });
+
+    return res.json({ success: true, memberView: false, count: profiles.length, stats, teaser });
   } catch (error) {
     console.error('Error fetching community profiles:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch profiles' });
+  }
+});
+
+/**
+ * GET    /api/community/session — validate the current member session
+ * DELETE /api/community/session — sign out (revoke the session)
+ */
+router.get('/session', async (req, res) => {
+  try {
+    const member = await findMemberSession(req);
+    if (!member) return res.status(401).json({ success: false, message: 'Not signed in' });
+    return res.json({ success: true, member: memberSummary(member.profile) });
+  } catch (error) {
+    console.error('❌ Session check error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong.' });
+  }
+});
+
+router.delete('/session', async (req, res) => {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    if (token) await MemberSession.deleteOne({ tokenHash: sha256(token) });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Sign out error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong.' });
   }
 });
 
@@ -270,6 +400,17 @@ router.get('/manage', async (req, res) => {
     }
 
     await applyClaim(profile);
+    await ensureMemberExtras(profile);
+
+    // Approved members get a browser session so the directory unlocks without
+    // another magic link. Pending applicants stay outside until approved.
+    let session = null;
+    if (profile.status === 'approved') {
+      session = await createMemberSession(profile);
+    }
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const viewsLast7Days = await ProfileView.countDocuments({ profileId: profile._id, viewedAt: { $gte: since } });
 
     return res.json({
       success: true,
@@ -284,7 +425,18 @@ router.get('/manage', async (req, res) => {
         bio: profile.bio,
         status: profile.status,
         isFounder: profile.isFounder,
+        roles: profile.roles,
+        lookingFor: profile.lookingFor,
+        openToConnect: profile.openToConnect,
+        memberNumber: profile.memberNumber,
+        inviteCode: profile.inviteCode,
       },
+      stats: { totalViews: profile.viewCount || 0, viewsLast7Days },
+      ...(session ? {
+        sessionToken: session.sessionToken,
+        sessionExpiresAt: session.expiresAt,
+        member: memberSummary(profile),
+      } : {}),
     });
   } catch (error) {
     console.error('❌ Manage fetch error:', error);
@@ -333,11 +485,212 @@ router.delete('/manage', async (req, res) => {
     if (profile.isFounder) {
       return res.status(403).json({ success: false, message: 'Founder profiles cannot be deleted.' });
     }
+    await MemberSession.deleteMany({ profileId: profile._id });
     await profile.deleteOne();
     return res.json({ success: true, message: 'Profile deleted.' });
   } catch (error) {
     console.error('❌ Manage delete error:', error);
     return res.status(500).json({ success: false, message: 'Something went wrong. Please try again.' });
+  }
+});
+
+/**
+ * POST /api/community/connect
+ *  - member session, no token: { toProfileId, message } → create a request and
+ *    email the target an accept/decline link (double opt-in; emails stay
+ *    hidden until acceptance)
+ *  - ?token=: { decision: 'accept' | 'decline' } → resolve it
+ * GET /api/community/connect?token= — request details for the decision page
+ */
+router.post('/connect', async (req, res) => {
+  try {
+    // Resolve a request via the emailed decision link
+    if (req.query.token) {
+      const request = await ConnectRequest.findOne({
+        decisionTokenHash: sha256(req.query.token),
+        decisionTokenExpiry: { $gt: new Date() },
+        status: 'pending',
+      });
+      if (!request) {
+        return res.status(401).json({ success: false, message: 'This link is invalid, expired, or already used.' });
+      }
+
+      const decision = req.body?.decision;
+      if (decision !== 'accept' && decision !== 'decline') {
+        return res.status(400).json({ success: false, message: 'Decision must be accept or decline.' });
+      }
+
+      const [from, to] = await Promise.all([
+        CommunityProfile.findById(request.fromProfileId),
+        CommunityProfile.findById(request.toProfileId),
+      ]);
+
+      request.status = decision === 'accept' ? 'accepted' : 'declined';
+      request.resolvedAt = new Date();
+      request.decisionTokenHash = null;
+      request.decisionTokenExpiry = null;
+      await request.save();
+
+      if (decision === 'accept' && from && to) {
+        // Intro both ways — this is the moment emails are revealed.
+        await sendEmail({
+          to: from.email,
+          subject: `${to.firstName} accepted your connect request 🎉`,
+          html: magicLinkHtml({
+            heading: `You're connected with ${to.firstName} ${to.lastName}!`,
+            intro: `Ciao ${from.firstName}! ${to.firstName} (${to.profession}${to.company ? ` at ${to.company}` : ''}) accepted your request. Reach out at ${to.email}${to.linkedIn ? ` or on LinkedIn: ${to.linkedIn}` : ''}.`,
+            link: `mailto:${to.email}`,
+            buttonLabel: `Email ${to.firstName}`,
+          }),
+          replyTo: to.email,
+        });
+        await sendEmail({
+          to: to.email,
+          subject: `You're now connected with ${from.firstName} ${from.lastName}`,
+          html: magicLinkHtml({
+            heading: `You're connected with ${from.firstName} ${from.lastName}!`,
+            intro: `Ciao ${to.firstName}! You accepted ${from.firstName}'s request (${from.profession}${from.company ? ` at ${from.company}` : ''}). Reach out at ${from.email}${from.linkedIn ? ` or on LinkedIn: ${from.linkedIn}` : ''}.`,
+            link: `mailto:${from.email}`,
+            buttonLabel: `Email ${from.firstName}`,
+          }),
+          replyTo: from.email,
+        });
+      }
+
+      return res.json({ success: true, decision: request.status });
+    }
+
+    // Create a new request (member session required)
+    const member = await findMemberSession(req);
+    if (!member) {
+      return res.status(401).json({ success: false, message: 'Sign in via your manage link to connect with members.' });
+    }
+
+    const { toProfileId } = req.body || {};
+    const message = (req.body?.message || '').trim().slice(0, 500);
+    if (!toProfileId) {
+      return res.status(400).json({ success: false, message: 'Missing target profile.' });
+    }
+    if (String(toProfileId) === String(member.profile._id)) {
+      return res.status(400).json({ success: false, message: "That's you!" });
+    }
+
+    const target = await CommunityProfile.findById(toProfileId);
+    if (!target || target.status !== 'approved') {
+      return res.status(404).json({ success: false, message: 'Member not found.' });
+    }
+    if (!target.openToConnect) {
+      return res.status(403).json({ success: false, message: 'This member is not accepting connect requests right now.' });
+    }
+
+    const pendingCount = await ConnectRequest.countDocuments({ fromProfileId: member.profile._id, status: 'pending' });
+    if (pendingCount >= MAX_PENDING_CONNECTS) {
+      return res.status(429).json({ success: false, message: `You can have up to ${MAX_PENDING_CONNECTS} pending requests. Wait for replies before sending more.` });
+    }
+
+    const existing = await ConnectRequest.findOne({
+      fromProfileId: member.profile._id,
+      toProfileId: target._id,
+      status: { $in: ['pending', 'accepted'] },
+    });
+    if (existing) {
+      const msg = existing.status === 'accepted'
+        ? "You're already connected with this member."
+        : 'You already have a pending request to this member.';
+      return res.status(409).json({ success: false, message: msg });
+    }
+
+    const decisionToken = crypto.randomBytes(32).toString('hex');
+    await ConnectRequest.create({
+      fromProfileId: member.profile._id,
+      toProfileId: target._id,
+      message,
+      decisionTokenHash: sha256(decisionToken),
+      decisionTokenExpiry: new Date(Date.now() + CONNECT_TOKEN_TTL_MS),
+    });
+
+    const from = member.profile;
+    await sendEmail({
+      to: target.email,
+      subject: `${from.firstName} ${from.lastName} wants to connect with you`,
+      html: magicLinkHtml({
+        heading: 'New connect request — Italian Tech Club NYC',
+        intro: `Ciao ${target.firstName}! ${from.firstName} ${from.lastName} (${from.profession}${from.company ? ` at ${from.company}` : ''}) would like to connect.${message ? ` Their message: “${message}”` : ''} Accept and we'll introduce you by email — decline and they won't be notified. The link expires in 7 days.`,
+        link: `${SITE_URL}/community/connect?token=${decisionToken}`,
+        buttonLabel: 'View Request',
+      }),
+    });
+
+    return res.status(201).json({ success: true, message: `Request sent! ${target.firstName} will get an email — if they accept, we'll introduce you.` });
+  } catch (error) {
+    console.error('❌ Connect error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong. Please try again.' });
+  }
+});
+
+router.get('/connect', async (req, res) => {
+  try {
+    const request = await ConnectRequest.findOne({
+      decisionTokenHash: sha256(req.query.token || ''),
+      decisionTokenExpiry: { $gt: new Date() },
+      status: 'pending',
+    }).populate('fromProfileId', 'firstName lastName profilePic profession company bio isFounder roles');
+    if (!request || !request.fromProfileId) {
+      return res.status(401).json({ success: false, message: 'This link is invalid, expired, or already used.' });
+    }
+    const from = request.fromProfileId;
+    return res.json({
+      success: true,
+      request: {
+        message: request.message,
+        createdAt: request.createdAt,
+        from: {
+          firstName: from.firstName,
+          lastName: from.lastName,
+          profilePic: from.profilePic,
+          profession: from.profession,
+          company: from.company,
+          bio: from.bio,
+          isFounder: from.isFounder,
+          roles: from.roles,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('❌ Connect fetch error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong. Please try again.' });
+  }
+});
+
+/**
+ * POST /api/community/view — record a profile view (member session required).
+ * Deduped per viewer per day; owners see aggregates only, never who.
+ */
+router.post('/view', async (req, res) => {
+  try {
+    const member = await findMemberSession(req);
+    if (!member) return res.status(401).json({ success: false, message: 'Not signed in' });
+
+    const { profileId } = req.body || {};
+    if (!profileId || String(profileId) === String(member.profile._id)) {
+      return res.json({ success: true, counted: false });
+    }
+
+    const day = new Date().toISOString().slice(0, 10);
+    const result = await ProfileView.updateOne(
+      { profileId, viewerProfileId: member.profile._id, day },
+      { $setOnInsert: { viewedAt: new Date() } },
+      { upsert: true },
+    );
+    if (result.upsertedCount) {
+      await CommunityProfile.updateOne({ _id: profileId }, { $inc: { viewCount: 1 } });
+    }
+    return res.json({ success: true, counted: !!result.upsertedCount });
+  } catch (error) {
+    // Duplicate upsert race is fine — the view is already counted.
+    if (error.code === 11000) return res.json({ success: true, counted: false });
+    console.error('❌ View tracking error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong.' });
   }
 });
 
@@ -405,7 +758,8 @@ router.post('/claim-request', async (req, res) => {
 router.get('/admin', requireAdmin, async (req, res) => {
   try {
     const pendingProfiles = await CommunityProfile.find({ status: 'pending' })
-      .select('firstName lastName email linkedIn profilePic profession company bio emailVerified createdAt')
+      .select('firstName lastName email linkedIn profilePic profession company bio emailVerified roles lookingFor referredBy createdAt')
+      .populate('referredBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -433,6 +787,7 @@ router.post('/admin', requireAdmin, async (req, res) => {
       if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
       profile.status = 'approved';
       await profile.save();
+      await ensureMemberExtras(profile);
       return res.json({ success: true, message: 'Profile approved.' });
     }
 

@@ -4,9 +4,12 @@ import crypto from 'crypto';
 /**
  * Consolidated community API. Vercel Hobby caps a deployment at 12 serverless
  * functions, so all community endpoints share this one dynamic route:
- *   GET    /api/community/profiles
+ *   GET    /api/community/profiles          (gated: full for members, teaser for visitors)
  *   POST   /api/community/submit
  *   GET|POST|PUT|DELETE /api/community/manage
+ *   GET|DELETE /api/community/session       (member session check / sign-out)
+ *   GET|POST /api/community/connect         (double-opt-in member intros)
+ *   POST   /api/community/view              (profile view tracking, member only)
  *   POST   /api/community/claim-request
  *   GET|POST /api/community/admin           (admin session required)
  * The segment after /community/ arrives as req.query.action.
@@ -34,6 +37,9 @@ async function connectDB() {
 }
 
 // Schema definitions (must match server/models/*)
+const ROLE_OPTIONS = ['founder', 'engineer', 'investor', 'innovator', 'tech-enthusiast', 'researcher'];
+const LOOKING_FOR_OPTIONS = ['cofounder', 'hiring', 'job', 'investors', 'beta-users', 'mentor'];
+
 const communityProfileSchema = new mongoose.Schema({
   firstName: { type: String, required: true, trim: true, maxlength: 50 },
   lastName: { type: String, required: true, trim: true, maxlength: 50 },
@@ -43,6 +49,13 @@ const communityProfileSchema = new mongoose.Schema({
   profession: { type: String, required: true, trim: true, maxlength: 100 },
   company: { type: String, trim: true, maxlength: 100, default: '' },
   bio: { type: String, maxlength: 500, default: '' },
+  roles: { type: [String], enum: ROLE_OPTIONS, default: [] },
+  lookingFor: { type: [String], enum: LOOKING_FOR_OPTIONS, default: [] },
+  openToConnect: { type: Boolean, default: true },
+  memberNumber: { type: Number, default: null },
+  viewCount: { type: Number, default: 0 },
+  inviteCode: { type: String, default: null },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', default: null },
   status: { type: String, enum: ['unclaimed', 'pending', 'approved', 'inactive'], default: 'pending' },
   emailVerified: { type: Boolean, default: false },
   isFounder: { type: Boolean, default: false },
@@ -58,6 +71,8 @@ const communityProfileSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'community_profiles',
 });
+communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterExpression: { memberNumber: { $type: 'number' } } });
+communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
 
 const emailClaimRequestSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
@@ -82,20 +97,82 @@ const adminSessionSchema = new mongoose.Schema({
 });
 adminSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const memberSessionSchema = new mongoose.Schema({
+  tokenHash: { type: String, required: true, unique: true },
+  profileId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', required: true },
+  email: { type: String, required: true, lowercase: true },
+  expiresAt: { type: Date, required: true },
+}, {
+  timestamps: true,
+  collection: 'member_sessions',
+});
+memberSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+memberSessionSchema.index({ profileId: 1 });
+
+const connectRequestSchema = new mongoose.Schema({
+  fromProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', required: true },
+  toProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', required: true },
+  message: { type: String, maxlength: 500, default: '' },
+  status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+  decisionTokenHash: { type: String, default: null },
+  decisionTokenExpiry: { type: Date, default: null },
+  resolvedAt: { type: Date, default: null },
+}, {
+  timestamps: true,
+  collection: 'connect_requests',
+});
+connectRequestSchema.index({ fromProfileId: 1, status: 1 });
+connectRequestSchema.index({ toProfileId: 1, status: 1 });
+
+const profileViewSchema = new mongoose.Schema({
+  profileId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', required: true },
+  viewerProfileId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', required: true },
+  day: { type: String, required: true }, // YYYY-MM-DD
+  viewedAt: { type: Date, default: Date.now },
+}, {
+  collection: 'profile_views',
+});
+profileViewSchema.index({ profileId: 1, viewerProfileId: 1, day: 1 }, { unique: true });
+profileViewSchema.index({ profileId: 1, viewedAt: 1 });
+
+const counterSchema = new mongoose.Schema({
+  _id: { type: String },
+  seq: { type: Number, default: 0 },
+}, {
+  collection: 'counters',
+});
+
 const CommunityProfile = mongoose.models.CommunityProfile || mongoose.model('CommunityProfile', communityProfileSchema);
 const EmailClaimRequest = mongoose.models.EmailClaimRequest || mongoose.model('EmailClaimRequest', emailClaimRequestSchema);
 const AdminSession = mongoose.models.AdminSession || mongoose.model('AdminSession', adminSessionSchema);
+const MemberSession = mongoose.models.MemberSession || mongoose.model('MemberSession', memberSessionSchema);
+const ConnectRequest = mongoose.models.ConnectRequest || mongoose.model('ConnectRequest', connectRequestSchema);
+const ProfileView = mongoose.models.ProfileView || mongoose.model('ProfileView', profileViewSchema);
+const Counter = mongoose.models.Counter || mongoose.model('Counter', counterSchema);
 
 const MANAGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
 const EMAIL_CHANGE_TTL_MS = 60 * 60 * 1000; // 60 minutes
+const MEMBER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MAX_PENDING_CONNECTS = 3; // outgoing pending requests per member
 const SITE_URL = process.env.SITE_URL || 'https://italiantechclubnyc.com';
 const FROM_EMAIL = process.env.SPONSOR_FROM_EMAIL || 'ITC Website <onboarding@resend.dev>';
-const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio'];
+const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect'];
+const MEMBER_VIEW_FIELDS = 'firstName lastName linkedIn profilePic profession company bio isFounder roles lookingFor openToConnect memberNumber createdAt';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
-async function sendMail(to, subject, { heading, intro, link, buttonLabel }) {
+async function nextSequence(name) {
+  const doc = await Counter.findOneAndUpdate(
+    { _id: name },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true },
+  );
+  return doc.seq;
+}
+
+async function sendMail(to, subject, { heading, intro, link, buttonLabel, replyTo }) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set — email not sent:', subject);
     return false;
@@ -110,7 +187,7 @@ async function sendMail(to, subject, { heading, intro, link, buttonLabel }) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html }),
+    body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
   });
   if (!response.ok) {
     console.error('Resend API error:', response.status, await response.text());
@@ -150,20 +227,299 @@ async function isAuthorized(req) {
   return !!session;
 }
 
+// Resolve the member session from the Authorization header. Only approved
+// profiles count as "inside" — a pending applicant's session (if any) doesn't
+// unlock the directory.
+async function findMemberSession(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) return null;
+  const session = await MemberSession.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date() } });
+  if (!session) return null;
+  const profile = await CommunityProfile.findById(session.profileId);
+  if (!profile || profile.status !== 'approved') return null;
+  return { session, profile };
+}
+
+// Approved members get a sequential member number and an invite code, assigned
+// once (on approval, claim, or first sign-in after this feature shipped).
+async function ensureMemberExtras(profile) {
+  if (profile.status !== 'approved') return;
+  let changed = false;
+  if (profile.memberNumber == null) {
+    profile.memberNumber = await nextSequence('memberNumber');
+    changed = true;
+  }
+  if (!profile.inviteCode) {
+    profile.inviteCode = crypto.randomBytes(6).toString('base64url');
+    changed = true;
+  }
+  if (changed) await profile.save();
+}
+
+async function createMemberSession(profile) {
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + MEMBER_SESSION_TTL_MS);
+  await MemberSession.create({
+    tokenHash: sha256(sessionToken),
+    profileId: profile._id,
+    email: profile.email,
+    expiresAt,
+  });
+  return { sessionToken, expiresAt };
+}
+
+const memberSummary = (profile) => ({
+  profileId: profile._id,
+  firstName: profile.firstName,
+  lastName: profile.lastName,
+  profilePic: profile.profilePic,
+  isFounder: profile.isFounder,
+  memberNumber: profile.memberNumber,
+});
+
 // ---- GET /api/community/profiles ----
+// Member session → full directory; anonymous → aggregate stats + anonymized
+// teaser (founders stay visible as the public face).
 async function handleProfiles(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Method not allowed' });
+
+  const member = await findMemberSession(req);
+
+  if (member) {
+    const profiles = await CommunityProfile.find({ status: 'approved' })
+      .select(MEMBER_VIEW_FIELDS)
+      .sort({ createdAt: -1 });
+    return res.status(200).json({
+      success: true,
+      memberView: true,
+      viewer: memberSummary(member.profile),
+      profiles,
+      count: profiles.length,
+    });
+  }
+
   const profiles = await CommunityProfile.find({ status: 'approved' })
-    .select('firstName lastName linkedIn profilePic profession company bio isFounder createdAt')
-    .sort({ createdAt: -1 });
-  return res.status(200).json({ success: true, profiles, count: profiles.length });
+    .select('firstName lastName profilePic profession isFounder roles lookingFor createdAt')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const stats = { total: profiles.length, founders: 0, roles: {}, lookingFor: {} };
+  for (const p of profiles) {
+    if (p.isFounder) stats.founders += 1;
+    for (const r of p.roles || []) stats.roles[r] = (stats.roles[r] || 0) + 1;
+    for (const l of p.lookingFor || []) stats.lookingFor[l] = (stats.lookingFor[l] || 0) + 1;
+  }
+
+  const teaser = profiles.map((p) => p.isFounder
+    ? { firstName: p.firstName, lastName: p.lastName, profilePic: p.profilePic, profession: p.profession, isFounder: true, createdAt: p.createdAt }
+    : { firstName: p.firstName, lastInitial: p.lastName?.[0] || '', profession: p.profession, lookingFor: p.lookingFor || [], isFounder: false, createdAt: p.createdAt });
+
+  return res.status(200).json({ success: true, memberView: false, count: profiles.length, stats, teaser });
+}
+
+// ---- GET|DELETE /api/community/session ----
+async function handleSession(req, res) {
+  if (req.method === 'GET') {
+    const member = await findMemberSession(req);
+    if (!member) return res.status(401).json({ success: false, message: 'Not signed in' });
+    return res.status(200).json({ success: true, member: memberSummary(member.profile) });
+  }
+  if (req.method === 'DELETE') {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    if (token) await MemberSession.deleteOne({ tokenHash: sha256(token) });
+    return res.status(200).json({ success: true });
+  }
+  return res.status(405).json({ success: false, message: 'Method not allowed' });
+}
+
+// ---- GET|POST /api/community/connect ----
+async function handleConnect(req, res) {
+  // Decision page data (via emailed token)
+  if (req.method === 'GET') {
+    const request = await ConnectRequest.findOne({
+      decisionTokenHash: sha256(req.query.token || ''),
+      decisionTokenExpiry: { $gt: new Date() },
+      status: 'pending',
+    }).populate('fromProfileId', 'firstName lastName profilePic profession company bio isFounder roles');
+    if (!request || !request.fromProfileId) {
+      return res.status(401).json({ success: false, message: 'This link is invalid, expired, or already used.' });
+    }
+    const from = request.fromProfileId;
+    return res.status(200).json({
+      success: true,
+      request: {
+        message: request.message,
+        createdAt: request.createdAt,
+        from: {
+          firstName: from.firstName,
+          lastName: from.lastName,
+          profilePic: from.profilePic,
+          profession: from.profession,
+          company: from.company,
+          bio: from.bio,
+          isFounder: from.isFounder,
+          roles: from.roles,
+        },
+      },
+    });
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method not allowed' });
+
+  // Resolve a request via the emailed decision link
+  if (req.query.token) {
+    const request = await ConnectRequest.findOne({
+      decisionTokenHash: sha256(req.query.token),
+      decisionTokenExpiry: { $gt: new Date() },
+      status: 'pending',
+    });
+    if (!request) {
+      return res.status(401).json({ success: false, message: 'This link is invalid, expired, or already used.' });
+    }
+
+    const decision = req.body?.decision;
+    if (decision !== 'accept' && decision !== 'decline') {
+      return res.status(400).json({ success: false, message: 'Decision must be accept or decline.' });
+    }
+
+    const [from, to] = await Promise.all([
+      CommunityProfile.findById(request.fromProfileId),
+      CommunityProfile.findById(request.toProfileId),
+    ]);
+
+    request.status = decision === 'accept' ? 'accepted' : 'declined';
+    request.resolvedAt = new Date();
+    request.decisionTokenHash = null;
+    request.decisionTokenExpiry = null;
+    await request.save();
+
+    if (decision === 'accept' && from && to) {
+      // Intro both ways — this is the moment emails are revealed.
+      try {
+        await sendMail(from.email, `${to.firstName} accepted your connect request 🎉`, {
+          heading: `You're connected with ${to.firstName} ${to.lastName}!`,
+          intro: `Ciao ${from.firstName}! ${to.firstName} (${to.profession}${to.company ? ` at ${to.company}` : ''}) accepted your request. Reach out at ${to.email}${to.linkedIn ? ` or on LinkedIn: ${to.linkedIn}` : ''}.`,
+          link: `mailto:${to.email}`,
+          buttonLabel: `Email ${to.firstName}`,
+          replyTo: to.email,
+        });
+        await sendMail(to.email, `You're now connected with ${from.firstName} ${from.lastName}`, {
+          heading: `You're connected with ${from.firstName} ${from.lastName}!`,
+          intro: `Ciao ${to.firstName}! You accepted ${from.firstName}'s request (${from.profession}${from.company ? ` at ${from.company}` : ''}). Reach out at ${from.email}${from.linkedIn ? ` or on LinkedIn: ${from.linkedIn}` : ''}.`,
+          link: `mailto:${from.email}`,
+          buttonLabel: `Email ${from.firstName}`,
+          replyTo: from.email,
+        });
+      } catch (e) {
+        console.error('intro email failed', e);
+      }
+    }
+
+    return res.status(200).json({ success: true, decision: request.status });
+  }
+
+  // Create a new request (member session required)
+  const member = await findMemberSession(req);
+  if (!member) {
+    return res.status(401).json({ success: false, message: 'Sign in via your manage link to connect with members.' });
+  }
+
+  const { toProfileId } = req.body || {};
+  const message = (req.body?.message || '').trim().slice(0, 500);
+  if (!toProfileId) {
+    return res.status(400).json({ success: false, message: 'Missing target profile.' });
+  }
+  if (String(toProfileId) === String(member.profile._id)) {
+    return res.status(400).json({ success: false, message: "That's you!" });
+  }
+
+  const target = await CommunityProfile.findById(toProfileId);
+  if (!target || target.status !== 'approved') {
+    return res.status(404).json({ success: false, message: 'Member not found.' });
+  }
+  if (!target.openToConnect) {
+    return res.status(403).json({ success: false, message: 'This member is not accepting connect requests right now.' });
+  }
+
+  const pendingCount = await ConnectRequest.countDocuments({ fromProfileId: member.profile._id, status: 'pending' });
+  if (pendingCount >= MAX_PENDING_CONNECTS) {
+    return res.status(429).json({ success: false, message: `You can have up to ${MAX_PENDING_CONNECTS} pending requests. Wait for replies before sending more.` });
+  }
+
+  const existing = await ConnectRequest.findOne({
+    fromProfileId: member.profile._id,
+    toProfileId: target._id,
+    status: { $in: ['pending', 'accepted'] },
+  });
+  if (existing) {
+    const msg = existing.status === 'accepted'
+      ? "You're already connected with this member."
+      : 'You already have a pending request to this member.';
+    return res.status(409).json({ success: false, message: msg });
+  }
+
+  const decisionToken = crypto.randomBytes(32).toString('hex');
+  await ConnectRequest.create({
+    fromProfileId: member.profile._id,
+    toProfileId: target._id,
+    message,
+    decisionTokenHash: sha256(decisionToken),
+    decisionTokenExpiry: new Date(Date.now() + CONNECT_TOKEN_TTL_MS),
+  });
+
+  const from = member.profile;
+  try {
+    await sendMail(target.email, `${from.firstName} ${from.lastName} wants to connect with you`, {
+      heading: 'New connect request — Italian Tech Club NYC',
+      intro: `Ciao ${target.firstName}! ${from.firstName} ${from.lastName} (${from.profession}${from.company ? ` at ${from.company}` : ''}) would like to connect.${message ? ` Their message: “${message}”` : ''} Accept and we'll introduce you by email — decline and they won't be notified. The link expires in 7 days.`,
+      link: `${SITE_URL}/community/connect?token=${decisionToken}`,
+      buttonLabel: 'View Request',
+    });
+  } catch (e) {
+    console.error('connect email failed', e);
+  }
+
+  return res.status(201).json({ success: true, message: `Request sent! ${target.firstName} will get an email — if they accept, we'll introduce you.` });
+}
+
+// ---- POST /api/community/view ----
+// Deduped per viewer per day; owners see aggregates only, never who.
+async function handleView(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method not allowed' });
+
+  const member = await findMemberSession(req);
+  if (!member) return res.status(401).json({ success: false, message: 'Not signed in' });
+
+  const { profileId } = req.body || {};
+  if (!profileId || String(profileId) === String(member.profile._id)) {
+    return res.status(200).json({ success: true, counted: false });
+  }
+
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    const result = await ProfileView.updateOne(
+      { profileId, viewerProfileId: member.profile._id, day },
+      { $setOnInsert: { viewedAt: new Date() } },
+      { upsert: true },
+    );
+    if (result.upsertedCount) {
+      await CommunityProfile.updateOne({ _id: profileId }, { $inc: { viewCount: 1 } });
+    }
+    return res.status(200).json({ success: true, counted: !!result.upsertedCount });
+  } catch (error) {
+    // Duplicate upsert race is fine — the view is already counted.
+    if (error.code === 11000) return res.status(200).json({ success: true, counted: false });
+    throw error;
+  }
 }
 
 // ---- POST /api/community/submit ----
 async function handleSubmit(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method not allowed' });
 
-  const { firstName, lastName, email, linkedIn, profilePic, profession, company, bio } = req.body;
+  const { firstName, lastName, email, linkedIn, profilePic, profession, company, bio, roles, lookingFor, ref } = req.body;
   if (!firstName || !lastName || !email || !linkedIn || !profilePic || !profession) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
@@ -176,6 +532,14 @@ async function handleSubmit(req, res) {
     return res.status(409).json({ success: false, message: 'A profile with this email already exists. Use the manage link to edit it.' });
   }
 
+  // Referral: an invite link (/community/join?ref=<code>) ties the applicant
+  // to the inviting member — surfaced to admins for faster approval.
+  let referredBy = null;
+  if (ref && typeof ref === 'string') {
+    const inviter = await CommunityProfile.findOne({ inviteCode: ref.trim(), status: 'approved' }).select('_id');
+    referredBy = inviter?._id || null;
+  }
+
   const verifyToken = crypto.randomBytes(32).toString('hex');
   const profile = new CommunityProfile({
     firstName: firstName.trim(),
@@ -186,6 +550,9 @@ async function handleSubmit(req, res) {
     profession: profession.trim(),
     company: company?.trim() || '',
     bio: bio?.trim() || '',
+    roles: Array.isArray(roles) ? roles : [],
+    lookingFor: Array.isArray(lookingFor) ? lookingFor : [],
+    referredBy,
     status: 'pending',
     manageTokenHash: sha256(verifyToken),
     manageTokenExpiry: new Date(Date.now() + MANAGE_TOKEN_TTL_MS),
@@ -300,6 +667,18 @@ async function handleManage(req, res) {
 
   if (req.method === 'GET') {
     await applyClaim(profile);
+    await ensureMemberExtras(profile);
+
+    // Approved members get a browser session so the directory unlocks without
+    // another magic link. Pending applicants stay outside until approved.
+    let session = null;
+    if (profile.status === 'approved') {
+      session = await createMemberSession(profile);
+    }
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const viewsLast7Days = await ProfileView.countDocuments({ profileId: profile._id, viewedAt: { $gte: since } });
+
     return res.status(200).json({
       success: true,
       profile: {
@@ -313,7 +692,18 @@ async function handleManage(req, res) {
         bio: profile.bio,
         status: profile.status,
         isFounder: profile.isFounder,
+        roles: profile.roles,
+        lookingFor: profile.lookingFor,
+        openToConnect: profile.openToConnect,
+        memberNumber: profile.memberNumber,
+        inviteCode: profile.inviteCode,
       },
+      stats: { totalViews: profile.viewCount || 0, viewsLast7Days },
+      ...(session ? {
+        sessionToken: session.sessionToken,
+        sessionExpiresAt: session.expiresAt,
+        member: memberSummary(profile),
+      } : {}),
     });
   }
 
@@ -330,6 +720,7 @@ async function handleManage(req, res) {
 
   if (req.method === 'DELETE') {
     if (profile.isFounder) return res.status(403).json({ success: false, message: 'Founder profiles cannot be deleted.' });
+    await MemberSession.deleteMany({ profileId: profile._id });
     await profile.deleteOne();
     return res.status(200).json({ success: true, message: 'Profile deleted.' });
   }
@@ -392,7 +783,8 @@ async function handleAdmin(req, res) {
 
   if (req.method === 'GET') {
     const pendingProfiles = await CommunityProfile.find({ status: 'pending' })
-      .select('firstName lastName email linkedIn profilePic profession company bio emailVerified createdAt')
+      .select('firstName lastName email linkedIn profilePic profession company bio emailVerified roles lookingFor referredBy createdAt')
+      .populate('referredBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -412,6 +804,7 @@ async function handleAdmin(req, res) {
       if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
       profile.status = 'approved';
       await profile.save();
+      await ensureMemberExtras(profile);
       return res.status(200).json({ success: true, message: 'Profile approved.' });
     }
 
@@ -499,6 +892,9 @@ export default async function handler(req, res) {
       case 'profiles': return await handleProfiles(req, res);
       case 'submit': return await handleSubmit(req, res);
       case 'manage': return await handleManage(req, res);
+      case 'session': return await handleSession(req, res);
+      case 'connect': return await handleConnect(req, res);
+      case 'view': return await handleView(req, res);
       case 'claim-request': return await handleClaimRequest(req, res);
       case 'admin': return await handleAdmin(req, res);
       default: return res.status(404).json({ success: false, message: 'Not found' });

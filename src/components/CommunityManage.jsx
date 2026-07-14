@@ -14,9 +14,16 @@ import {
   AtSign,
   Clock,
   UserPlus,
+  Eye,
+  Hash,
+  Copy,
+  Sparkles,
+  Handshake,
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
+import { setMemberSession, clearMemberSession } from '../lib/memberSession';
+import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
 
 const PROFILE_PIC_SIZE = 400;
 const MAX_FILE_SIZE_MB = 5;
@@ -27,6 +34,29 @@ const inputClasses = (hasError) => `w-full px-4 py-3 rounded-xl border bg-white 
 } focus:border-itc-green focus:ring-2 focus:ring-itc-green/20 outline-none transition-all`;
 
 const cardClasses = 'w-full max-w-md mx-auto p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl';
+
+// Multi-select pill picker for roles / looking-for
+const TogglePills = ({ options, selected = [], onToggle }) => (
+  <div className="flex flex-wrap gap-2">
+    {options.map((option) => {
+      const active = selected.includes(option.value);
+      return (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onToggle(option.value)}
+          className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
+            active
+              ? 'bg-itc-green text-white border-itc-green'
+              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-itc-green hover:text-itc-green'
+          }`}
+        >
+          {option.label}
+        </button>
+      );
+    })}
+  </div>
+);
 
 // Entry screen (no token): claim/manage by email, or request to claim with a new email
 const ManageEntry = () => {
@@ -335,9 +365,54 @@ const ChangeEmailSection = ({ token, currentEmail }) => {
   );
 };
 
+// Personal referral link — invited applicants show up flagged for admins
+const InviteCard = ({ inviteCode }) => {
+  const [copied, setCopied] = useState(false);
+  const inviteUrl = `${window.location.origin}/community/join?ref=${inviteCode}`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable — the URL is visible to copy manually.
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+      <h2 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+        <UserPlus className="w-5 h-5 text-itc-green" /> Invite Someone
+      </h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+        Know an Italian in tech who belongs here? Share your personal link — applications through it carry your name.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          readOnly
+          value={inviteUrl}
+          onFocus={(e) => e.target.select()}
+          className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm outline-none"
+        />
+        <button
+          type="button"
+          onClick={copy}
+          className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors flex items-center gap-2 flex-shrink-0"
+        >
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Token present — edit / delete / change-email of own profile
 const EditProfile = ({ token }) => {
   const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -354,8 +429,15 @@ const EditProfile = ({ token }) => {
       try {
         const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`);
         const data = await response.json();
-        if (response.ok && data.success) setProfile(data.profile);
-        else setLoadError(data.message || 'This link is invalid or has expired.');
+        if (response.ok && data.success) {
+          setProfile(data.profile);
+          setStats(data.stats || null);
+          // The manage link doubles as sign-in: persist the member session so
+          // the community directory unlocks in this browser.
+          if (data.sessionToken) {
+            setMemberSession({ token: data.sessionToken, expiresAt: data.sessionExpiresAt, member: data.member });
+          }
+        } else setLoadError(data.message || 'This link is invalid or has expired.');
       } catch {
         setLoadError('Could not reach the server. Please try again.');
       } finally {
@@ -366,6 +448,13 @@ const EditProfile = ({ token }) => {
   }, [token]);
 
   const set = (field) => (e) => setProfile((prev) => ({ ...prev, [field]: e.target.value }));
+  const toggleIn = (field) => (value) => setProfile((prev) => {
+    const current = prev[field] || [];
+    return {
+      ...prev,
+      [field]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+    };
+  });
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -406,6 +495,9 @@ const EditProfile = ({ token }) => {
           profession: profile.profession,
           company: profile.company,
           bio: profile.bio,
+          roles: profile.roles || [],
+          lookingFor: profile.lookingFor || [],
+          openToConnect: profile.openToConnect !== false,
         }),
       });
       const data = await response.json();
@@ -426,6 +518,7 @@ const EditProfile = ({ token }) => {
       const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Failed to delete');
+      clearMemberSession();
       setDone('deleted');
     } catch (error) {
       setSaveError(error.message || 'Something went wrong. Please try again.');
@@ -508,6 +601,29 @@ const EditProfile = ({ token }) => {
         </div>
       )}
 
+      {/* Member stats — private, only the owner ever sees these */}
+      {profile.status === 'approved' && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+            <Hash className="w-4 h-4 text-itc-green mx-auto mb-1" />
+            <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">
+              {profile.memberNumber != null ? `#${String(profile.memberNumber).padStart(3, '0')}` : '—'}
+            </p>
+            <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Member</p>
+          </div>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+            <Eye className="w-4 h-4 text-itc-green mx-auto mb-1" />
+            <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.viewsLast7Days ?? 0}</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Views this week</p>
+          </div>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+            <Eye className="w-4 h-4 text-slate-400 mx-auto mb-1" />
+            <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.totalViews ?? 0}</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Total views</p>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Your Profile</h2>
 
@@ -563,6 +679,48 @@ const EditProfile = ({ token }) => {
           <p className="text-xs text-slate-400 text-right mt-1">{(profile.bio || '').length}/500</p>
         </div>
       </div>
+
+      {/* Community signals: roles, looking-for, connect availability */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-itc-green" />
+          Community Signals
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+          Help other members find you — these power the directory badges and filters.
+        </p>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">I am a...</label>
+          <TogglePills options={ROLE_OPTIONS} selected={profile.roles || []} onToggle={toggleIn('roles')} />
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">I'm looking for...</label>
+          <TogglePills options={LOOKING_FOR_OPTIONS} selected={profile.lookingFor || []} onToggle={toggleIn('lookingFor')} />
+        </div>
+
+        <div className="flex items-start justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <Handshake className="w-4 h-4 text-itc-green" /> Open to connect
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              Members can request an intro. You approve by email before anyone gets your contact.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setProfile((prev) => ({ ...prev, openToConnect: prev.openToConnect === false }))}
+            className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${profile.openToConnect !== false ? 'bg-itc-green' : 'bg-slate-300 dark:bg-slate-700'}`}
+            aria-label="Toggle open to connect"
+          >
+            <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${profile.openToConnect !== false ? 'left-6' : 'left-1'}`} />
+          </button>
+        </div>
+      </div>
+
+      {profile.inviteCode && <InviteCard inviteCode={profile.inviteCode} />}
 
       <ChangeEmailSection token={token} currentEmail={profile.email} />
 

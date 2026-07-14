@@ -22,8 +22,11 @@ const CommunityTeaser = () => {
         const response = await fetch(`${API_URL}/api/community/profiles`);
         const data = await response.json();
         if (data.success) {
+          // The endpoint is gated: members get `profiles`, visitors get an
+          // anonymized `teaser` where only founders carry full identity.
+          const list = data.memberView ? data.profiles : (data.teaser || []);
           setFounders(
-            data.profiles
+            list
               .filter((p) => p.isFounder)
               .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
           );
@@ -67,7 +70,7 @@ const CommunityTeaser = () => {
               <div className="flex -space-x-3">
                 {founders.map((founder, index) => (
                   <div
-                    key={founder._id}
+                    key={founder._id || `${founder.firstName}-${index}`}
                     className={`w-12 h-12 rounded-full bg-gradient-to-br ${GRADIENTS[index % GRADIENTS.length]} border-2 border-slate-900 dark:border-black flex items-center justify-center text-sm font-bold overflow-hidden`}
                     title={`${founder.firstName} ${founder.lastName}`}
                   >

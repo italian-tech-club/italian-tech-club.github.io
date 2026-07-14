@@ -109,10 +109,25 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
                         {!p.emailVerified && (
                           <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">email unverified</span>
                         )}
+                        {p.referredBy && (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-itc-green/10 text-itc-green font-medium">
+                            invited by {p.referredBy.firstName} {p.referredBy.lastName}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         {p.profession}{p.company ? ` · ${p.company}` : ''}
                       </p>
+                      {(p.roles?.length > 0 || p.lookingFor?.length > 0) && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {(p.roles || []).map((r) => (
+                            <span key={r} className="px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{r}</span>
+                          ))}
+                          {(p.lookingFor || []).map((l) => (
+                            <span key={l} className="px-2 py-0.5 rounded-full text-xs bg-itc-green/10 text-itc-green">seeks: {l}</span>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                         <a href={`mailto:${p.email}`} className="flex items-center gap-1 hover:text-itc-green"><Mail className="w-3 h-3" /> {p.email}</a>
                         {p.linkedIn && (

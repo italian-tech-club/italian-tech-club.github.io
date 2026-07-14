@@ -11,7 +11,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "migrate:events": "node scripts/migrate-events.js",
     "seed:founders": "node scripts/seed-founders.js",
-    "seed:community": "node scripts/seed-community.js"
+    "seed:community": "node scripts/seed-community.js",
+    "backfill:member-numbers": "node scripts/backfill-member-numbers.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
