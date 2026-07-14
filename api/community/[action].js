@@ -269,6 +269,23 @@ async function createMemberSession(profile) {
   return { sessionToken, expiresAt };
 }
 
+// Most-viewed profile of the day (🔥 badge). Falls back to yesterday while
+// today has no views yet, so the badge is always someone's.
+async function findHotProfileId() {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  for (const day of [today, yesterday]) {
+    const top = await ProfileView.aggregate([
+      { $match: { day } },
+      { $group: { _id: '$profileId', views: { $sum: 1 } } },
+      { $sort: { views: -1 } },
+      { $limit: 1 },
+    ]);
+    if (top.length) return top[0]._id;
+  }
+  return null;
+}
+
 // Manage endpoints accept either a fresh magic-link token (claim/sign-in) or
 // an existing member session (returning member editing later). Returns
 // { profile, viaToken } or null.
@@ -299,13 +316,17 @@ async function handleProfiles(req, res) {
   const member = await findMemberSession(req);
 
   if (member) {
-    const profiles = await CommunityProfile.find({ status: 'approved' })
-      .select(MEMBER_VIEW_FIELDS)
-      .sort({ createdAt: -1 });
+    const [profiles, hotProfileId] = await Promise.all([
+      CommunityProfile.find({ status: 'approved' })
+        .select(MEMBER_VIEW_FIELDS)
+        .sort({ createdAt: -1 }),
+      findHotProfileId(),
+    ]);
     return res.status(200).json({
       success: true,
       memberView: true,
       viewer: memberSummary(member.profile),
+      hotProfileId,
       profiles,
       count: profiles.length,
     });

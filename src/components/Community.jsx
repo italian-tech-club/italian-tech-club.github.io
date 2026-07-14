@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Sparkles,
   Hash,
+  Flame,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { getMemberSession, memberAuthHeaders, clearMemberSession } from '../lib/memberSession';
@@ -173,7 +174,7 @@ const ConnectSection = ({ profile, viewer }) => {
 };
 
 // Profile Modal
-const ProfileModal = ({ profile, index, viewer, onClose }) => {
+const ProfileModal = ({ profile, index, viewer, isHot = false, onClose }) => {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = 'unset'; };
@@ -204,6 +205,12 @@ const ProfileModal = ({ profile, index, viewer, onClose }) => {
             <X className="w-5 h-5" />
           </button>
           <div className="absolute top-4 left-4 flex flex-col items-start gap-2">
+            {isHot && (
+              <div className="px-3 py-1.5 rounded-full bg-orange-500 text-white text-sm font-medium flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 fill-current" />
+                Most viewed today
+              </div>
+            )}
             {profile.isFounder && (
               <div className="px-3 py-1.5 rounded-full bg-itc-green text-white text-sm font-medium flex items-center gap-1.5">
                 <Star className="w-3.5 h-3.5 fill-current" />
@@ -260,7 +267,7 @@ const ProfileModal = ({ profile, index, viewer, onClose }) => {
 };
 
 // Profile Card (members' view)
-const ProfileCard = ({ profile, onClick, index = 0, isSelf = false }) => (
+const ProfileCard = ({ profile, onClick, index = 0, isSelf = false, isHot = false }) => (
   <motion.div
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
@@ -283,23 +290,31 @@ const ProfileCard = ({ profile, onClick, index = 0, isSelf = false }) => (
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-      {profile.isFounder && (
-        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-itc-green text-white text-xs font-semibold flex items-center gap-1">
-          <Star className="w-3 h-3 fill-current" />
-          <span className="hidden sm:inline">Founding Team</span>
-        </div>
-      )}
-
-      {isSelf ? (
-        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 text-slate-900 text-xs font-semibold flex items-center gap-1">
-          You · edit
-        </div>
-      ) : profile.lookingFor?.length > 0 && (
-        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-medium flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-itc-green" />
-          <span className="hidden lg:inline">{lookingForLabel(profile.lookingFor[0])}{profile.lookingFor.length > 1 ? ` +${profile.lookingFor.length - 1}` : ''}</span>
-        </div>
-      )}
+      {/* Badge row — wraps instead of overlapping when both chips are wide */}
+      <div className="absolute top-3 left-3 right-3 flex flex-wrap items-start gap-1.5">
+        {isHot && (
+          <div className="flex-shrink-0 px-2.5 py-1 rounded-full bg-orange-500 text-white text-xs font-semibold flex items-center gap-1" title="Most viewed profile today">
+            <Flame className="w-3 h-3 fill-current" />
+            <span className="hidden sm:inline">On fire</span>
+          </div>
+        )}
+        {profile.isFounder && (
+          <div className="flex-shrink-0 px-2.5 py-1 rounded-full bg-itc-green text-white text-xs font-semibold flex items-center gap-1">
+            <Star className="w-3 h-3 fill-current" />
+            <span className="hidden sm:inline">Founding Team</span>
+          </div>
+        )}
+        {isSelf ? (
+          <div className="ml-auto px-2.5 py-1 rounded-full bg-white/90 text-slate-900 text-xs font-semibold flex items-center gap-1">
+            You · edit
+          </div>
+        ) : profile.lookingFor?.length > 0 && (
+          <div className="ml-auto px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-medium flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-itc-green flex-shrink-0" />
+            <span className="hidden lg:inline whitespace-nowrap">{lookingForLabel(profile.lookingFor[0])}{profile.lookingFor.length > 1 ? ` +${profile.lookingFor.length - 1}` : ''}</span>
+          </div>
+        )}
+      </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
         <h3 className="text-lg sm:text-xl font-bold leading-tight">{profile.firstName} {profile.lastName}</h3>
@@ -591,6 +606,7 @@ const Community = () => {
             profile={selected.profile}
             index={selected.index}
             viewer={data?.viewer}
+            isHot={String(selected.profile._id) === String(data?.hotProfileId)}
             onClose={() => setSelected(null)}
           />
         )}
@@ -725,6 +741,7 @@ const Community = () => {
                         profile={profile}
                         index={index}
                         isSelf={isSelf}
+                        isHot={String(profile._id) === String(data.hotProfileId)}
                         onClick={() => (isSelf ? navigate('/community/manage') : setSelected({ profile, index }))}
                       />
                     );

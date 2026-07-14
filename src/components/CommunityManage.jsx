@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Check,
   AlertCircle,
-  Home,
   Loader2,
   Trash2,
   Save,
@@ -19,6 +18,7 @@ import {
   Copy,
   Sparkles,
   Handshake,
+  ArrowLeft,
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
@@ -616,8 +616,7 @@ const EditProfile = ({ token }) => {
 
       {/* Member stats — private, only the owner ever sees these */}
       {profile.status === 'approved' && (
-        <div>
-          <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
               <Hash className="w-4 h-4 text-itc-green mx-auto mb-1" />
               <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">
@@ -635,10 +634,6 @@ const EditProfile = ({ token }) => {
               <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.totalViews ?? 0}</p>
               <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Profile views · all</p>
             </div>
-          </div>
-          <p className="text-xs text-slate-400 mt-2 text-center">
-            How many members viewed <span className="font-medium">your</span> profile — only you can see this.
-          </p>
         </div>
       )}
 
@@ -790,10 +785,11 @@ const CommunityManage = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors duration-300">
       <div className="absolute top-6 left-6 right-6 flex justify-between items-center z-20">
         <Link
-          to="/"
+          to="/community"
+          title="Back to the community"
           className="p-3 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-itc-green dark:hover:text-itc-green transition-all shadow-sm hover:shadow-md"
         >
-          <Home className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5" />
         </Link>
         <ThemeToggle className="shadow-sm hover:shadow-md" />
       </div>
