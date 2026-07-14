@@ -269,6 +269,18 @@ async function createMemberSession(profile) {
   return { sessionToken, expiresAt };
 }
 
+// Manage endpoints accept either a fresh magic-link token (claim/sign-in) or
+// an existing member session (returning member editing later). Returns
+// { profile, viaToken } or null.
+async function resolveManageAuth(req) {
+  if (req.query.token) {
+    const profile = await findProfileByToken(req.query.token);
+    return profile ? { profile, viaToken: true } : null;
+  }
+  const member = await findMemberSession(req);
+  return member ? { profile: member.profile, viaToken: false } : null;
+}
+
 const memberSummary = (profile) => ({
   profileId: profile._id,
   firstName: profile.firstName,
@@ -584,10 +596,11 @@ async function handleSubmit(req, res) {
 // ---- GET|POST|PUT|DELETE /api/community/manage ----
 async function handleManage(req, res) {
   if (req.method === 'POST') {
-    // Primary-email change (requires a valid manage token)
-    if (req.query.token && req.body?.action === 'change-email') {
-      const profile = await findProfileByToken(req.query.token);
-      if (!profile) return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
+    // Primary-email change (manage token or member session)
+    if (req.body?.action === 'change-email') {
+      const auth = await resolveManageAuth(req);
+      if (!auth) return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
+      const profile = auth.profile;
 
       const newEmail = (req.body.newEmail || '').toLowerCase().trim();
       if (!EMAIL_RE.test(newEmail)) return res.status(400).json({ success: false, message: 'Please enter a valid email.' });
@@ -624,11 +637,11 @@ async function handleManage(req, res) {
     profile.manageTokenExpiry = new Date(Date.now() + MANAGE_TOKEN_TTL_MS);
     await profile.save();
 
-    await sendMail(profile.email, 'Manage your ITC community profile', {
-      heading: 'Manage your profile — Italian Tech Club NYC',
-      intro: `Ciao ${profile.firstName}! Click the link below to claim or edit your community profile. The link expires in 60 minutes.`,
+    await sendMail(profile.email, 'Your ITC community sign-in link', {
+      heading: 'Sign in — Italian Tech Club NYC',
+      intro: `Ciao ${profile.firstName}! Click the link below to sign in to the community — browse members, connect, and edit your profile. The link expires in 60 minutes.`,
       link: `${SITE_URL}/community/manage?token=${token}`,
-      buttonLabel: 'Manage My Profile',
+      buttonLabel: 'Sign In',
     });
 
     return res.status(200).json(genericResponse);
@@ -661,18 +674,19 @@ async function handleManage(req, res) {
     return res.status(200).json({ success: true, emailChanged: true, email: profile.email });
   }
 
-  // Everything below requires a valid manage token
-  const profile = await findProfileByToken(req.query.token);
-  if (!profile) return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
+  // Everything below requires a manage token or a member session
+  const auth = await resolveManageAuth(req);
+  if (!auth) return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
+  const { profile, viaToken } = auth;
 
   if (req.method === 'GET') {
-    await applyClaim(profile);
+    if (viaToken) await applyClaim(profile);
     await ensureMemberExtras(profile);
 
-    // Approved members get a browser session so the directory unlocks without
-    // another magic link. Pending applicants stay outside until approved.
+    // A magic link doubles as sign-in: approved members get a browser session
+    // so the directory unlocks. Session-based visits already have one.
     let session = null;
-    if (profile.status === 'approved') {
+    if (viaToken && profile.status === 'approved') {
       session = await createMemberSession(profile);
     }
 
@@ -713,7 +727,7 @@ async function handleManage(req, res) {
         profile[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
       }
     }
-    await applyClaim(profile);
+    if (viaToken) await applyClaim(profile);
     await profile.save();
     return res.status(200).json({ success: true, message: 'Profile updated!' });
   }

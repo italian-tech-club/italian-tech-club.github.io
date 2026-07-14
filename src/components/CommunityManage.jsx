@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Mail,
   Upload,
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
-import { setMemberSession, clearMemberSession } from '../lib/memberSession';
+import { setMemberSession, clearMemberSession, getMemberSession, memberAuthHeaders } from '../lib/memberSession';
 import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
 
 const PROFILE_PIC_SIZE = 400;
@@ -116,17 +116,17 @@ const RequestLink = () => {
       <div className="w-12 h-12 rounded-full bg-itc-green/10 flex items-center justify-center mx-auto mb-6">
         <Mail className="w-5 h-5 text-itc-green" />
       </div>
-      <h1 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-1">Claim or Manage Your Profile</h1>
+      <h1 className="text-xl font-bold text-slate-900 dark:text-white text-center mb-1">Member Sign In</h1>
 
       {sent ? (
         <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-4">
           If a profile with <span className="font-medium text-slate-700 dark:text-slate-300">{email}</span> exists,
-          a secure link is on its way. Check your inbox — the link expires in 60 minutes.
+          a sign-in link is on its way. Check your inbox — the link expires in 60 minutes.
         </p>
       ) : (
         <>
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-6">
-            Enter the email you registered with and we'll send you a link to claim or edit your profile.
+            Enter the email you registered with — we'll send you a sign-in link. No password needed.
           </p>
           <input
             type="email"
@@ -146,7 +146,7 @@ const RequestLink = () => {
             disabled={loading || !email}
             className="w-full mt-6 px-6 py-3 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email Me a Link'}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email Me a Sign-In Link'}
           </button>
         </>
       )}
@@ -294,7 +294,7 @@ const ConfirmEmailChange = ({ emailToken }) => {
   );
 };
 
-// Change the primary email while signed in via a manage token
+// Change the primary email while signed in (manage token or member session)
 const ChangeEmailSection = ({ token, currentEmail }) => {
   const [open, setOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -308,9 +308,10 @@ const ChangeEmailSection = ({ token, currentEmail }) => {
     setError('');
     setMessage('');
     try {
-      const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, {
+      const authQS = token ? `?token=${encodeURIComponent(token)}` : '';
+      const response = await fetch(`${API_URL}/api/community/manage${authQS}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? {} : memberAuthHeaders()) },
         body: JSON.stringify({ action: 'change-email', newEmail }),
       });
       const data = await response.json();
@@ -409,8 +410,10 @@ const InviteCard = ({ inviteCode }) => {
   );
 };
 
-// Token present — edit / delete / change-email of own profile
+// Edit / delete / change-email of own profile. Reached either with a magic-link
+// token (?token=) or with a stored member session (token = null).
 const EditProfile = ({ token }) => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -424,20 +427,29 @@ const EditProfile = ({ token }) => {
   const [picError, setPicError] = useState('');
   const fileInputRef = useRef(null);
 
+  const authQS = token ? `?token=${encodeURIComponent(token)}` : '';
+  const authHeaders = token ? {} : memberAuthHeaders();
+
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`);
+        const response = await fetch(`${API_URL}/api/community/manage${authQS}`, { headers: authHeaders });
         const data = await response.json();
         if (response.ok && data.success) {
-          setProfile(data.profile);
-          setStats(data.stats || null);
-          // The manage link doubles as sign-in: persist the member session so
-          // the community directory unlocks in this browser.
+          // A magic link is a sign-in, not an edit intent: store the session
+          // and land on the directory. Editing happens later via "Edit profile".
+          // (Pending applicants get no session — they fall through to the form.)
           if (data.sessionToken) {
             setMemberSession({ token: data.sessionToken, expiresAt: data.sessionExpiresAt, member: data.member });
+            navigate('/community', { replace: true });
+            return;
           }
-        } else setLoadError(data.message || 'This link is invalid or has expired.');
+          setProfile(data.profile);
+          setStats(data.stats || null);
+        } else {
+          if (!token) clearMemberSession(); // stale session — force the entry screen next time
+          setLoadError(data.message || 'This link is invalid or has expired.');
+        }
       } catch {
         setLoadError('Could not reach the server. Please try again.');
       } finally {
@@ -445,6 +457,7 @@ const EditProfile = ({ token }) => {
       }
     };
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const set = (field) => (e) => setProfile((prev) => ({ ...prev, [field]: e.target.value }));
@@ -484,9 +497,9 @@ const EditProfile = ({ token }) => {
     setSaving(true);
     try {
       const linkedIn = (profile.linkedIn || '').trim();
-      const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, {
+      const response = await fetch(`${API_URL}/api/community/manage${authQS}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           firstName: profile.firstName,
           lastName: profile.lastName,
@@ -515,7 +528,7 @@ const EditProfile = ({ token }) => {
     setDeleting(true);
     setSaveError('');
     try {
-      const response = await fetch(`${API_URL}/api/community/manage?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/api/community/manage${authQS}`, { method: 'DELETE', headers: authHeaders });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Failed to delete');
       clearMemberSession();
@@ -530,7 +543,7 @@ const EditProfile = ({ token }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-3 text-slate-500 dark:text-slate-400 py-20">
-        <Loader2 className="w-5 h-5 animate-spin" /> Loading your profile...
+        <Loader2 className="w-5 h-5 animate-spin" /> {token ? 'Signing you in...' : 'Loading your profile...'}
       </div>
     );
   }
@@ -790,7 +803,9 @@ const CommunityManage = () => {
           ? <ConfirmEmailChange emailToken={emailToken} />
           : token
             ? <EditProfile token={token} />
-            : <ManageEntry />}
+            : getMemberSession()
+              ? <EditProfile token={null} />
+              : <ManageEntry />}
       </div>
     </div>
   );

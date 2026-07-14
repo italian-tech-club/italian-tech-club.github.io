@@ -73,6 +73,18 @@ async function createMemberSession(profile) {
   return { sessionToken, expiresAt };
 }
 
+// Manage endpoints accept either a fresh magic-link token (claim/sign-in) or
+// an existing member session (returning member editing later). Returns
+// { profile, viaToken } or null.
+async function resolveManageAuth(req) {
+  if (req.query.token) {
+    const profile = await findProfileByToken(req.query.token);
+    return profile ? { profile, viaToken: true } : null;
+  }
+  const member = await findMemberSession(req);
+  return member ? { profile: member.profile, viaToken: false } : null;
+}
+
 const memberSummary = (profile) => ({
   profileId: profile._id,
   firstName: profile.firstName,
@@ -284,12 +296,13 @@ router.delete('/session', async (req, res) => {
  */
 router.post('/manage', async (req, res) => {
   try {
-    // Primary-email change (requires a valid manage token)
-    if (req.query.token && req.body?.action === 'change-email') {
-      const profile = await findProfileByToken(req.query.token);
-      if (!profile) {
+    // Primary-email change (manage token or member session)
+    if (req.body?.action === 'change-email') {
+      const auth = await resolveManageAuth(req);
+      if (!auth) {
         return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
       }
+      const profile = auth.profile;
 
       const newEmail = (req.body.newEmail || '').toLowerCase().trim();
       if (!EMAIL_RE.test(newEmail)) {
@@ -342,12 +355,12 @@ router.post('/manage', async (req, res) => {
 
     await sendEmail({
       to: profile.email,
-      subject: 'Manage your ITC community profile',
+      subject: 'Your ITC community sign-in link',
       html: magicLinkHtml({
-        heading: 'Manage your profile — Italian Tech Club NYC',
-        intro: `Ciao ${profile.firstName}! Click the link below to claim or edit your community profile. The link expires in 60 minutes.`,
+        heading: 'Sign in — Italian Tech Club NYC',
+        intro: `Ciao ${profile.firstName}! Click the link below to sign in to the community — browse members, connect, and edit your profile. The link expires in 60 minutes.`,
         link: `${SITE_URL}/community/manage?token=${token}`,
-        buttonLabel: 'Manage My Profile',
+        buttonLabel: 'Sign In',
       }),
     });
 
@@ -394,18 +407,19 @@ router.get('/manage', async (req, res) => {
       return res.json({ success: true, emailChanged: true, email: profile.email });
     }
 
-    const profile = await findProfileByToken(req.query.token);
-    if (!profile) {
+    const auth = await resolveManageAuth(req);
+    if (!auth) {
       return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
     }
+    const { profile, viaToken } = auth;
 
-    await applyClaim(profile);
+    if (viaToken) await applyClaim(profile);
     await ensureMemberExtras(profile);
 
-    // Approved members get a browser session so the directory unlocks without
-    // another magic link. Pending applicants stay outside until approved.
+    // A magic link doubles as sign-in: approved members get a browser session
+    // so the directory unlocks. Session-based visits already have one.
     let session = null;
-    if (profile.status === 'approved') {
+    if (viaToken && profile.status === 'approved') {
       session = await createMemberSession(profile);
     }
 
@@ -445,21 +459,22 @@ router.get('/manage', async (req, res) => {
 });
 
 /**
- * PUT /api/community/manage?token= — update own profile
+ * PUT /api/community/manage — update own profile (token or member session)
  */
 router.put('/manage', async (req, res) => {
   try {
-    const profile = await findProfileByToken(req.query.token);
-    if (!profile) {
+    const auth = await resolveManageAuth(req);
+    if (!auth) {
       return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
     }
+    const { profile, viaToken } = auth;
 
     for (const field of EDITABLE_FIELDS) {
       if (req.body[field] !== undefined) {
         profile[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
       }
     }
-    await applyClaim(profile);
+    if (viaToken) await applyClaim(profile);
     await profile.save();
 
     return res.json({ success: true, message: 'Profile updated!' });
@@ -474,14 +489,15 @@ router.put('/manage', async (req, res) => {
 });
 
 /**
- * DELETE /api/community/manage?token= — delete own profile
+ * DELETE /api/community/manage — delete own profile (token or member session)
  */
 router.delete('/manage', async (req, res) => {
   try {
-    const profile = await findProfileByToken(req.query.token);
-    if (!profile) {
+    const auth = await resolveManageAuth(req);
+    if (!auth) {
       return res.status(401).json({ success: false, message: 'This link is invalid or has expired. Request a new one.' });
     }
+    const profile = auth.profile;
     if (profile.isFounder) {
       return res.status(403).json({ success: false, message: 'Founder profiles cannot be deleted.' });
     }
