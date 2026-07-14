@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Linkedin,
   Search,
@@ -260,7 +260,7 @@ const ProfileModal = ({ profile, index, viewer, onClose }) => {
 };
 
 // Profile Card (members' view)
-const ProfileCard = ({ profile, onClick, index = 0 }) => (
+const ProfileCard = ({ profile, onClick, index = 0, isSelf = false }) => (
   <motion.div
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
@@ -290,7 +290,11 @@ const ProfileCard = ({ profile, onClick, index = 0 }) => (
         </div>
       )}
 
-      {profile.lookingFor?.length > 0 && (
+      {isSelf ? (
+        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 text-slate-900 text-xs font-semibold flex items-center gap-1">
+          You · edit
+        </div>
+      ) : profile.lookingFor?.length > 0 && (
         <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-medium flex items-center gap-1">
           <Sparkles className="w-3 h-3 text-itc-green" />
           <span className="hidden lg:inline">{lookingForLabel(profile.lookingFor[0])}{profile.lookingFor.length > 1 ? ` +${profile.lookingFor.length - 1}` : ''}</span>
@@ -488,6 +492,7 @@ const LockedDirectory = ({ data }) => {
 };
 
 const Community = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -712,14 +717,18 @@ const Community = () => {
             {filteredProfiles.length > 0 && (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
                 <AnimatePresence mode="popLayout">
-                  {filteredProfiles.map((profile, index) => (
-                    <ProfileCard
-                      key={profile._id || profile.id}
-                      profile={profile}
-                      index={index}
-                      onClick={() => setSelected({ profile, index })}
-                    />
-                  ))}
+                  {filteredProfiles.map((profile, index) => {
+                    const isSelf = String(profile._id) === String(data.viewer?.profileId);
+                    return (
+                      <ProfileCard
+                        key={profile._id || profile.id}
+                        profile={profile}
+                        index={index}
+                        isSelf={isSelf}
+                        onClick={() => (isSelf ? navigate('/community/manage') : setSelected({ profile, index }))}
+                      />
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             )}

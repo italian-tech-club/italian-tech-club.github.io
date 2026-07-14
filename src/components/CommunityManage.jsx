@@ -616,24 +616,29 @@ const EditProfile = ({ token }) => {
 
       {/* Member stats — private, only the owner ever sees these */}
       {profile.status === 'approved' && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
-            <Hash className="w-4 h-4 text-itc-green mx-auto mb-1" />
-            <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">
-              {profile.memberNumber != null ? `#${String(profile.memberNumber).padStart(3, '0')}` : '—'}
-            </p>
-            <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Member</p>
+        <div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+              <Hash className="w-4 h-4 text-itc-green mx-auto mb-1" />
+              <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">
+                {profile.memberNumber != null ? `#${String(profile.memberNumber).padStart(3, '0')}` : '—'}
+              </p>
+              <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Member</p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+              <Eye className="w-4 h-4 text-itc-green mx-auto mb-1" />
+              <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.viewsLast7Days ?? 0}</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Profile views · 7d</p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+              <Eye className="w-4 h-4 text-slate-400 mx-auto mb-1" />
+              <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.totalViews ?? 0}</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Profile views · all</p>
+            </div>
           </div>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
-            <Eye className="w-4 h-4 text-itc-green mx-auto mb-1" />
-            <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.viewsLast7Days ?? 0}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Views this week</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
-            <Eye className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-            <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">{stats?.totalViews ?? 0}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">Total views</p>
-          </div>
+          <p className="text-xs text-slate-400 mt-2 text-center">
+            How many members viewed <span className="font-medium">your</span> profile — only you can see this.
+          </p>
         </div>
       )}
 
