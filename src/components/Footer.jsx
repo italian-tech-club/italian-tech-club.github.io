@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const chapters = [
   { name: 'Barcelona', flag: '🇪🇸', url: 'https://www.italiantechclub.com' },
@@ -56,6 +57,10 @@ const Footer = () => {
         <div className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-sm opacity-60">
           <div>
             &copy; {new Date().getFullYear()} Italian Tech Club. All rights reserved.
+          </div>
+          <div className="flex items-center gap-6">
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

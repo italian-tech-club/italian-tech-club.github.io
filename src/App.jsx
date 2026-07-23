@@ -23,6 +23,8 @@ import Community from './components/Community';
 import CommunityJoin from './components/CommunityJoin';
 import CommunityManage from './components/CommunityManage';
 import CommunityConnect from './components/CommunityConnect';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfService from './components/TermsOfService';
 
 // Homepage component with all sections.
 const HomePage = () => {
@@ -79,6 +81,8 @@ function App() {
       <Route path="/community/manage" element={<CommunityManage />} />
       <Route path="/community/connect" element={<CommunityConnect />} />
       <Route path="/sponsor" element={<SponsorPage />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route path="/admin" element={<AdminEvents />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -148,6 +148,11 @@ const RequestLink = () => {
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email Me a Sign-In Link'}
           </button>
+          <p className="text-xs text-slate-400 text-center mt-4">
+            By signing in you agree to our{' '}
+            <Link to="/terms" className="text-itc-green hover:underline">Terms</Link> and{' '}
+            <Link to="/privacy" className="text-itc-green hover:underline">Privacy Policy</Link>.
+          </p>
         </>
       )}
     </motion.form>
@@ -156,7 +161,7 @@ const RequestLink = () => {
 
 // Lost access to the registered email → request to take over with a new one (admin approves)
 const ClaimRequestForm = () => {
-  const [form, setForm] = useState({ fullName: '', currentEmail: '', newEmail: '', message: '' });
+  const [form, setForm] = useState({ fullName: '', currentEmail: '', newEmail: '', message: '', agreedToTerms: false });
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -169,6 +174,10 @@ const ClaimRequestForm = () => {
     setError('');
     if (!form.fullName.trim() || !form.newEmail.trim()) {
       setError('Your name and the new email are required.');
+      return;
+    }
+    if (!form.agreedToTerms) {
+      setError('Please confirm you are 13+ and agree to the Terms and Privacy Policy.');
       return;
     }
     setLoading(true);
@@ -219,6 +228,24 @@ const ClaimRequestForm = () => {
         <input type="email" value={form.newEmail} onChange={set('newEmail')} placeholder="New email you want to use *" className={inputClasses(false)} />
         <textarea value={form.message} onChange={set('message')} rows={3} maxLength={1000} placeholder="Anything that helps us verify it's you (optional)" className={`${inputClasses(false)} resize-none`} />
       </div>
+
+      <label className="flex items-start gap-3 cursor-pointer mt-4">
+        <input
+          type="checkbox"
+          checked={form.agreedToTerms}
+          onChange={(e) => setForm((f) => ({ ...f, agreedToTerms: e.target.checked }))}
+          className="mt-0.5 w-5 h-5 flex-shrink-0 rounded border-slate-300 dark:border-slate-600 text-itc-green focus:ring-itc-green/30 accent-itc-green"
+        />
+        <span className="text-sm text-slate-600 dark:text-slate-400">
+          I am 13 or older and agree to the{' '}
+          <Link to="/terms" target="_blank" className="text-itc-green font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+            Terms of Service
+          </Link>{' '}and{' '}
+          <Link to="/privacy" target="_blank" className="text-itc-green font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+            Privacy Policy
+          </Link>.
+        </span>
+      </label>
 
       {error && (
         <p className="flex items-center gap-2 text-sm text-red-500 mt-3">

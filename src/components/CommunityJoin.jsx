@@ -50,6 +50,7 @@ const CommunityJoin = () => {
     profilePic: null,
     profilePicPreview: null,
     membershipFormCompleted: false,
+    agreedToTerms: false,
   });
   // Referral code from an invite link (/community/join?ref=<code>)
   const [refCode] = useState(() => new URLSearchParams(window.location.search).get('ref') || '');
@@ -143,6 +144,7 @@ const CommunityJoin = () => {
     if (!formData.profession.trim()) newErrors.profession = 'Profession is required';
     if (!formData.profilePic) newErrors.profilePic = 'Profile picture is required';
     if (!formData.membershipFormCompleted) newErrors.membershipFormCompleted = 'Please confirm you completed the membership application form';
+    if (!formData.agreedToTerms) newErrors.agreedToTerms = 'Please agree to the Terms of Service and Privacy Policy';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -570,6 +572,35 @@ const CommunityJoin = () => {
             {errors.membershipFormCompleted && (
               <p className="mt-3 text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="w-4 h-4" /> {errors.membershipFormCompleted}
+              </p>
+            )}
+          </motion.div>
+
+          {/* Terms & privacy consent */}
+          <motion.div variants={item} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border ${errors.agreedToTerms ? 'border-red-300 dark:border-red-800 error-field' : 'border-slate-100 dark:border-slate-800'}`}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.agreedToTerms}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, agreedToTerms: e.target.checked }));
+                  if (errors.agreedToTerms) setErrors(prev => ({ ...prev, agreedToTerms: null }));
+                }}
+                className="mt-0.5 w-5 h-5 flex-shrink-0 rounded border-slate-300 dark:border-slate-600 text-itc-green focus:ring-itc-green/30 accent-itc-green"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                I am 13 or older and agree to the{' '}
+                <Link to="/terms" target="_blank" className="text-itc-green font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+                  Terms of Service
+                </Link>{' '}and{' '}
+                <Link to="/privacy" target="_blank" className="text-itc-green font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+                  Privacy Policy
+                </Link>. *
+              </span>
+            </label>
+            {errors.agreedToTerms && (
+              <p className="mt-3 text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" /> {errors.agreedToTerms}
               </p>
             )}
           </motion.div>
