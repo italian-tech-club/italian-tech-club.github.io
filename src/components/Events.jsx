@@ -27,15 +27,17 @@ const GalleryModal = ({ event, onClose }) => {
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, []);
+  }, [images.length]);
 
   const nextImage = (e) => {
     e?.stopPropagation();
+    if (images.length === 0) return;
     setCurrentIndex((prev) => (prev + 1) % images.length);
   };
 
   const prevImage = (e) => {
     e?.stopPropagation();
+    if (images.length === 0) return;
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
