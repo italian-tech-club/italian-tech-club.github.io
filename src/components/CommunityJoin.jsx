@@ -311,6 +311,30 @@ const CommunityJoin = () => {
             >
               Open Membership Form <ArrowRight className="w-4 h-4" />
             </a>
+
+            {/* First blocker: confirm the membership form is done before applying */}
+            <div className={`mt-5 rounded-xl border p-4 ${errors.membershipFormCompleted ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/20 error-field' : 'border-slate-200 dark:border-slate-700'}`}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.membershipFormCompleted}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, membershipFormCompleted: e.target.checked }));
+                    if (errors.membershipFormCompleted) setErrors(prev => ({ ...prev, membershipFormCompleted: null }));
+                  }}
+                  className="mt-0.5 w-5 h-5 flex-shrink-0 rounded border-slate-300 dark:border-slate-600 text-itc-green focus:ring-itc-green/30 accent-itc-green"
+                />
+                <span className="text-sm text-slate-700 dark:text-slate-300">
+                  I've already completed the membership application form above. *
+                </span>
+              </label>
+              {errors.membershipFormCompleted && (
+                <p className="mt-2 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" /> {errors.membershipFormCompleted}
+                </p>
+              )}
+            </div>
+
             <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
               Already a member?{' '}
               <Link to="/community/manage" className="text-itc-green font-medium hover:underline">
@@ -548,32 +572,6 @@ const CommunityJoin = () => {
                 })}
               </div>
             </div>
-          </motion.div>
-
-          {/* Membership form confirmation */}
-          <motion.div variants={item} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border ${errors.membershipFormCompleted ? 'border-red-300 dark:border-red-800 error-field' : 'border-slate-100 dark:border-slate-800'}`}>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.membershipFormCompleted}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, membershipFormCompleted: e.target.checked }));
-                  if (errors.membershipFormCompleted) setErrors(prev => ({ ...prev, membershipFormCompleted: null }));
-                }}
-                className="mt-0.5 w-5 h-5 flex-shrink-0 rounded border-slate-300 dark:border-slate-600 text-itc-green focus:ring-itc-green/30 accent-itc-green"
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">
-                I confirm I have already completed the{' '}
-                <a href={MEMBER_FORM_URL} target="_blank" rel="noopener noreferrer" className="text-itc-green font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
-                  ITC membership application form
-                </a>. *
-              </span>
-            </label>
-            {errors.membershipFormCompleted && (
-              <p className="mt-3 text-sm text-red-500 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" /> {errors.membershipFormCompleted}
-              </p>
-            )}
           </motion.div>
 
           {/* Terms & privacy consent */}
