@@ -12,7 +12,9 @@
     "migrate:events": "node scripts/migrate-events.js",
     "seed:founders": "node scripts/seed-founders.js",
     "seed:community": "node scripts/seed-community.js",
-    "backfill:member-numbers": "node scripts/backfill-member-numbers.js"
+    "backfill:member-numbers": "node scripts/backfill-member-numbers.js",
+    "backfill:pics": "node scripts/backfill-profile-pics.js",
+    "collect:pics": "node scripts/collect-linkedin-pics.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -34,6 +36,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
     "concurrently": "^10.0.3",
+    "playwright-core": "^1.61.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.5"

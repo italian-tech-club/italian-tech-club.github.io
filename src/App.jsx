@@ -25,9 +25,7 @@ import CommunityManage from './components/CommunityManage';
 import CommunityConnect from './components/CommunityConnect';
 
 // Homepage component with all sections.
-// `preview` surfaces experimental features (community teaser + nav link) that
-// stay hidden on the public homepage — reached via the unadvertised /preview URL.
-const HomePage = ({ preview = false }) => {
+const HomePage = () => {
   useEffect(() => {
     // Handle hash navigation on load
     if (window.location.hash) {
@@ -43,14 +41,14 @@ const HomePage = ({ preview = false }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 selection:bg-itc-green selection:text-white transition-colors duration-300">
-      <Navbar preview={preview} />
+      <Navbar />
       <main>
         <Hero />
         <About />
         <Activities />
         <Events />
         <Team />
-        {preview && <CommunityTeaser />}
+        <CommunityTeaser />
         <Sponsor />
         <Contact />
       </main>
@@ -70,15 +68,12 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      {/* Unadvertised preview of the homepage with experimental features on */}
-      <Route path="/preview" element={<HomePage preview />} />
       <Route path="/cofounder-matching" element={<CoFounderMatching />} />
       <Route path="/cofounders" element={<CoFounderProfiles />} />
       <Route path="/whatsapp" element={<WhatsAppRedirect />} />
       <Route path="/qr" element={<WhatsAppQR />} />
       <Route path="/matching-qr" element={<MatchingQR />} />
       <Route path="/events" element={<AllEvents />} />
-      {/* Community pages are always routed but unlinked from the public homepage */}
       <Route path="/community" element={<Community />} />
       <Route path="/community/join" element={<CommunityJoin />} />
       <Route path="/community/manage" element={<CommunityManage />} />

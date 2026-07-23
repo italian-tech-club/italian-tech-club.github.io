@@ -152,11 +152,14 @@ const Counter = mongoose.models.Counter || mongoose.model('Counter', counterSche
 
 const MANAGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
 const EMAIL_CHANGE_TTL_MS = 60 * 60 * 1000; // 60 minutes
+const APPROVAL_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — sign-in link in the acceptance email
 const MEMBER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_PENDING_CONNECTS = 3; // outgoing pending requests per member
 const SITE_URL = process.env.SITE_URL || 'https://italiantechclubnyc.com';
 const FROM_EMAIL = process.env.SPONSOR_FROM_EMAIL || 'ITC Website <onboarding@resend.dev>';
+// Where new-application notifications are sent (the club's shared inbox).
+const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || 'ciao@italiantechclubnyc.com';
 const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect'];
 const MEMBER_VIEW_FIELDS = 'firstName lastName linkedIn profilePic profession company bio isFounder roles lookingFor openToConnect memberNumber createdAt';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -604,6 +607,19 @@ async function handleSubmit(req, res) {
     console.error('Failed to send verification email:', e);
   }
 
+  // Notify the club inbox so an admin can review + approve the new applicant.
+  try {
+    await sendMail(ADMIN_NOTIFY_EMAIL, `New community join request: ${profile.firstName} ${profile.lastName}`, {
+      heading: 'New community join request',
+      intro: `${profile.firstName} ${profile.lastName} (${profile.profession}${profile.company ? ` at ${profile.company}` : ''}) asked to join the community.<br/>Email: ${profile.email}<br/>LinkedIn: ${profile.linkedIn}${profile.bio ? `<br/>Bio: ${profile.bio}` : ''}<br/><br/>Review and approve them in the admin dashboard.`,
+      link: `${SITE_URL}/admin`,
+      buttonLabel: 'Review in Admin',
+      replyTo: profile.email,
+    });
+  } catch (e) {
+    console.error('Failed to send admin notification email:', e);
+  }
+
   return res.status(201).json({
     success: true,
     message: emailSent
@@ -837,9 +853,30 @@ async function handleAdmin(req, res) {
     if (action === 'approve-profile') {
       const profile = await CommunityProfile.findById(req.body.profileId);
       if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
+      const alreadyApproved = profile.status === 'approved';
       profile.status = 'approved';
+      // A fresh sign-in token makes the acceptance email one click into the
+      // directory. Longer-lived than a normal magic link so it survives a day
+      // or two in the inbox before they open it.
+      const signInToken = crypto.randomBytes(32).toString('hex');
+      profile.manageTokenHash = sha256(signInToken);
+      profile.manageTokenExpiry = new Date(Date.now() + APPROVAL_TOKEN_TTL_MS);
       await profile.save();
       await ensureMemberExtras(profile);
+
+      if (!alreadyApproved) {
+        try {
+          await sendMail(profile.email, "You're in! Welcome to the Italian Tech Club community 🎉", {
+            heading: `Welcome to the community, ${profile.firstName}! 🇮🇹`,
+            intro: `Ciao ${profile.firstName}! Your profile has been approved — you're now part of the Italian Tech Club NYC community. Click below to sign in, browse fellow members, and start connecting. This link expires in 7 days.`,
+            link: `${SITE_URL}/community/manage?token=${signInToken}`,
+            buttonLabel: 'Sign In to the Community',
+          });
+        } catch (e) {
+          console.error('Failed to send approval email:', e);
+        }
+      }
+
       return res.status(200).json({ success: true, message: 'Profile approved.' });
     }
 

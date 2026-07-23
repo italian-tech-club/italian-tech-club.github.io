@@ -25,7 +25,7 @@ import ThemeToggle from './ThemeToggle';
 import { setMemberSession, clearMemberSession, getMemberSession, memberAuthHeaders } from '../lib/memberSession';
 import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
 
-const PROFILE_PIC_SIZE = 400;
+const PROFILE_PIC_SIZE = 800;
 const MAX_FILE_SIZE_MB = 5;
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -604,6 +604,7 @@ const EditProfile = ({ token }) => {
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
           }}
+          outputSize={PROFILE_PIC_SIZE}
         />
       )}
 

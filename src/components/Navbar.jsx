@@ -8,9 +8,9 @@ import { EASE } from '../lib/motion';
 
 const BASE_NAV_ITEMS = ['Who we are', 'What we do', 'Events', 'Team'];
 
-const Navbar = ({ preview = false }) => {
+const Navbar = () => {
   const { theme } = useTheme();
-  const NAV_ITEMS = [...BASE_NAV_ITEMS, ...(preview ? ['Community'] : []), 'Sponsor'];
+  const NAV_ITEMS = [...BASE_NAV_ITEMS, 'Community', 'Sponsor'];
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 

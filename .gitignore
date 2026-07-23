@@ -43,3 +43,7 @@ public/mockServiceWorker.js
 
 # Member roster export — PII, seeded via scripts/seed-community.js. Never commit.
 itc-contacts.csv
+
+# LinkedIn browser session for scripts/collect-linkedin-pics.js — holds your
+# logged-in cookies. Never commit.
+.linkedin-session/

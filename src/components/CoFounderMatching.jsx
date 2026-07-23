@@ -317,6 +317,7 @@ const CoFounderMatching = () => {
           imageFile={selectedFile}
           onCropComplete={handleCropComplete}
           onCancel={handleCropCancel}
+          outputSize={PROFILE_PIC_SIZE}
         />
       )}
 

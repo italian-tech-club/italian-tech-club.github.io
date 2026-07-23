@@ -3,7 +3,7 @@ import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { X, Check, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
-const CROP_SIZE = 400; // Final output size in pixels
+const DEFAULT_CROP_SIZE = 800; // Final output size in pixels — matches the high-res LinkedIn photos in the directory
 const ASPECT_RATIO = 1; // Square
 const MIN_CROP_PERCENT = 30; // Minimum crop size as percentage
 
@@ -32,7 +32,8 @@ function ensureMinCrop(crop, minPercent) {
   };
 }
 
-const ImageCropper = ({ imageFile, onCropComplete, onCancel }) => {
+const ImageCropper = ({ imageFile, onCropComplete, onCancel, outputSize = DEFAULT_CROP_SIZE }) => {
+  const CROP_SIZE = outputSize;
   const [crop, setCrop] = useState();
   const [completedCrop, setCompletedCrop] = useState();
   const [scale, setScale] = useState(1);
@@ -90,7 +91,7 @@ const ImageCropper = ({ imageFile, onCropComplete, onCancel }) => {
     // Convert to base64
     const base64 = canvas.toDataURL('image/jpeg', 0.9);
     onCropComplete(base64);
-  }, [completedCrop, onCropComplete]);
+  }, [completedCrop, onCropComplete, CROP_SIZE]);
 
   const resetCrop = () => {
     if (imgRef.current) {

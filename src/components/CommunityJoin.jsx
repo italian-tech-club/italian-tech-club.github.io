@@ -19,7 +19,7 @@ import ThemeToggle from './ThemeToggle';
 import { MEMBER_FORM_URL } from '../config';
 import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
 
-const PROFILE_PIC_SIZE = 400;
+const PROFILE_PIC_SIZE = 800;
 const MAX_FILE_SIZE_MB = 5;
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -49,6 +49,7 @@ const CommunityJoin = () => {
     lookingFor: [],
     profilePic: null,
     profilePicPreview: null,
+    membershipFormCompleted: false,
   });
   // Referral code from an invite link (/community/join?ref=<code>)
   const [refCode] = useState(() => new URLSearchParams(window.location.search).get('ref') || '');
@@ -141,6 +142,7 @@ const CommunityJoin = () => {
     if (!formData.linkedIn.trim()) newErrors.linkedIn = 'LinkedIn profile is required';
     if (!formData.profession.trim()) newErrors.profession = 'Profession is required';
     if (!formData.profilePic) newErrors.profilePic = 'Profile picture is required';
+    if (!formData.membershipFormCompleted) newErrors.membershipFormCompleted = 'Please confirm you completed the membership application form';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -251,6 +253,7 @@ const CommunityJoin = () => {
           imageFile={selectedFile}
           onCropComplete={handleCropComplete}
           onCancel={handleCropCancel}
+          outputSize={PROFILE_PIC_SIZE}
         />
       )}
 
@@ -543,6 +546,32 @@ const CommunityJoin = () => {
                 })}
               </div>
             </div>
+          </motion.div>
+
+          {/* Membership form confirmation */}
+          <motion.div variants={item} className={`bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-sm border ${errors.membershipFormCompleted ? 'border-red-300 dark:border-red-800 error-field' : 'border-slate-100 dark:border-slate-800'}`}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.membershipFormCompleted}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, membershipFormCompleted: e.target.checked }));
+                  if (errors.membershipFormCompleted) setErrors(prev => ({ ...prev, membershipFormCompleted: null }));
+                }}
+                className="mt-0.5 w-5 h-5 flex-shrink-0 rounded border-slate-300 dark:border-slate-600 text-itc-green focus:ring-itc-green/30 accent-itc-green"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                I confirm I have already completed the{' '}
+                <a href={MEMBER_FORM_URL} target="_blank" rel="noopener noreferrer" className="text-itc-green font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+                  ITC membership application form
+                </a>. *
+              </span>
+            </label>
+            {errors.membershipFormCompleted && (
+              <p className="mt-3 text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" /> {errors.membershipFormCompleted}
+              </p>
+            )}
           </motion.div>
 
           {/* Submit */}
