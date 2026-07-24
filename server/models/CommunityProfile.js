@@ -123,6 +123,17 @@ const communityProfileSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // When the claim/welcome email was last sent to this member, and how many
+  // times total. Powers the admin claim-campaign dashboard ("emailed 2d ago",
+  // "never emailed") and guards against accidental double-sends.
+  lastClaimEmailAt: {
+    type: Date,
+    default: null,
+  },
+  claimEmailCount: {
+    type: Number,
+    default: 0,
+  },
   // GDPR consent to be listed publicly. Seeded members who did not consent stay
   // hidden until they claim (which records consent).
   gdprConsent: {

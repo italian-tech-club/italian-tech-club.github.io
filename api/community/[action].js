@@ -61,6 +61,8 @@ const communityProfileSchema = new mongoose.Schema({
   isFounder: { type: Boolean, default: false },
   seeded: { type: Boolean, default: false },
   claimed: { type: Boolean, default: false },
+  lastClaimEmailAt: { type: Date, default: null },
+  claimEmailCount: { type: Number, default: 0 },
   gdprConsent: { type: Boolean, default: false },
   manageTokenHash: { type: String, default: null },
   manageTokenExpiry: { type: Date, default: null },
@@ -164,7 +166,24 @@ const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'pro
 const MEMBER_VIEW_FIELDS = 'firstName lastName linkedIn profilePic profession company bio isFounder roles lookingFor openToConnect memberNumber createdAt';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Defaults for the admin claim-email campaign (editable per-send in the UI).
+const CLAIM_BUTTON_LABEL = 'Claim & Sign In';
+const CLAIM_EMAIL_BATCH_SIZE = 100; // Resend batch endpoint hard limit
+const DEFAULT_CLAIM_SUBJECT = 'Claim your Italian Tech Club profile 🇮🇹';
+const DEFAULT_CLAIM_BODY = `Ciao {{firstName}}!
+
+Your Italian Tech Club NYC profile is ready. We've set it up from our community roster — claim it to make it live, browse fellow members, and start connecting.
+
+Click below to sign in and claim your profile. The link expires in 7 days.`;
+
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+// Split an array into chunks of at most `size`.
+const chunk = (arr, size) => {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
 
 async function nextSequence(name) {
   const doc = await Counter.findOneAndUpdate(
@@ -197,6 +216,74 @@ async function sendMail(to, subject, { heading, intro, link, buttonLabel, replyT
     return false;
   }
   return true;
+}
+
+// Send a fully-rendered HTML email (custom body, no fixed template). Used by the
+// admin claim campaign. Never throws.
+async function sendRawEmail(to, subject, html) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not set — email not sent:', subject);
+    return false;
+  }
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html }),
+    });
+    if (!response.ok) {
+      console.error('Resend API error:', response.status, await response.text());
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Resend exception:', e);
+    return false;
+  }
+}
+
+// Send many distinct emails in one Resend batch call (<=100 per request). Never
+// throws; returns per-recipient ok flags.
+async function sendEmailBatch(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return { ok: true, results: [] };
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not set — batch not sent:', messages.length);
+    return { ok: false, results: messages.map((m) => ({ to: m.to, ok: false })) };
+  }
+  const payload = messages.map((m) => ({ from: FROM_EMAIL, to: [m.to], subject: m.subject, html: m.html }));
+  try {
+    const response = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      console.error('Resend batch API error:', response.status, await response.text());
+      return { ok: false, results: messages.map((m) => ({ to: m.to, ok: false })) };
+    }
+    return { ok: true, results: messages.map((m) => ({ to: m.to, ok: true })) };
+  } catch (e) {
+    console.error('Resend batch exception:', e);
+    return { ok: false, results: messages.map((m) => ({ to: m.to, ok: false })) };
+  }
+}
+
+// Substitute campaign placeholders: {{firstName}}, {{lastName}}, {{link}}.
+function fillTemplate(str, { firstName = '', lastName = '', link = '' } = {}) {
+  return String(str ?? '')
+    .split('{{firstName}}').join(firstName)
+    .split('{{lastName}}').join(lastName)
+    .split('{{link}}').join(link);
+}
+
+// Wrap an admin-authored body (plain text w/ newlines) + always append a claim button.
+function campaignHtml({ bodyHtml, link, buttonLabel }) {
+  const body = String(bodyHtml ?? '').replace(/\n/g, '<br/>');
+  return `
+    <div style="font-size:15px;line-height:1.6;">${body}</div>
+    <p style="margin-top:24px;"><a href="${link}" style="display:inline-block;padding:12px 24px;background:#0f172a;color:#ffffff;border-radius:9999px;text-decoration:none;font-weight:bold;">${buttonLabel}</a></p>
+    <p style="color:#64748b;font-size:12px;">If the button doesn't work, copy this URL: ${link}</p>
+  `;
 }
 
 async function findProfileByToken(token) {
@@ -844,7 +931,24 @@ async function handleAdmin(req, res) {
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.status(200).json({ success: true, pendingProfiles, claimRequests });
+    // Full roster for the members dashboard + claim campaign. Small collection,
+    // so we compute stats in JS from the same array (no extra round-trip).
+    const members = await CommunityProfile.find({})
+      .select('firstName lastName email status seeded claimed emailVerified memberNumber viewCount lastClaimEmailAt claimEmailCount createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const stats = {
+      total: members.length,
+      claimed: members.filter((m) => m.claimed).length,
+      unclaimed: members.filter((m) => !m.claimed).length,
+      seeded: members.filter((m) => m.seeded).length,
+      seededUnclaimed: members.filter((m) => m.seeded && !m.claimed).length,
+      neverEmailed: members.filter((m) => !m.lastClaimEmailAt).length,
+      byStatus: members.reduce((acc, m) => { acc[m.status] = (acc[m.status] || 0) + 1; return acc; }, {}),
+    };
+
+    return res.status(200).json({ success: true, pendingProfiles, claimRequests, members, stats });
   }
 
   if (req.method === 'POST') {
@@ -936,6 +1040,110 @@ async function handleAdmin(req, res) {
       request.resolvedAt = new Date();
       await request.save();
       return res.status(200).json({ success: true, message: 'Claim request rejected.' });
+    }
+
+    // Batch claim/welcome email to selected members. Each recipient gets a fresh
+    // 7-day magic link; opening it signs them in and flips `claimed: true`.
+    if (action === 'send-claim-emails') {
+      const { profileIds, subject, bodyHtml } = req.body || {};
+      if (!Array.isArray(profileIds) || profileIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'Select at least one member.' });
+      }
+      const subj = (typeof subject === 'string' && subject.trim()) || DEFAULT_CLAIM_SUBJECT;
+      const rawBody = (typeof bodyHtml === 'string' && bodyHtml.trim()) || DEFAULT_CLAIM_BODY;
+
+      const profiles = await CommunityProfile.find({ _id: { $in: profileIds } });
+      if (profiles.length === 0) {
+        return res.status(404).json({ success: false, message: 'No matching profiles found.' });
+      }
+
+      const now = new Date();
+      const expiry = new Date(now.getTime() + APPROVAL_TOKEN_TTL_MS);
+      const tokenOps = [];
+      const messages = [];
+      const meta = [];
+
+      for (const p of profiles) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const link = `${SITE_URL}/community/manage?token=${token}`;
+        const ctx = { firstName: p.firstName, lastName: p.lastName, link };
+        tokenOps.push({
+          updateOne: {
+            filter: { _id: p._id },
+            update: { $set: { manageTokenHash: sha256(token), manageTokenExpiry: expiry } },
+          },
+        });
+        messages.push({
+          to: p.email,
+          subject: fillTemplate(subj, ctx),
+          html: campaignHtml({ bodyHtml: fillTemplate(rawBody, ctx), link, buttonLabel: CLAIM_BUTTON_LABEL }),
+        });
+        meta.push({ profileId: p._id, email: p.email });
+      }
+
+      // Persist tokens first so the links are valid before any email lands.
+      await CommunityProfile.bulkWrite(tokenOps);
+
+      const sentOk = new Set();
+      for (const group of chunk(messages, CLAIM_EMAIL_BATCH_SIZE)) {
+        const { results } = await sendEmailBatch(group);
+        for (const r of results) if (r.ok) sentOk.add(r.to);
+      }
+
+      const stampOps = meta
+        .filter((m) => sentOk.has(m.email))
+        .map((m) => ({
+          updateOne: {
+            filter: { _id: m.profileId },
+            update: { $set: { lastClaimEmailAt: now }, $inc: { claimEmailCount: 1 } },
+          },
+        }));
+      if (stampOps.length > 0) await CommunityProfile.bulkWrite(stampOps);
+
+      const sent = sentOk.size;
+      const failed = meta.length - sent;
+      return res.status(200).json({
+        success: true,
+        sent,
+        failed,
+        message: `Sent ${sent} claim email${sent === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`,
+        results: meta.map((m) => ({ profileId: m.profileId, email: m.email, ok: sentOk.has(m.email) })),
+      });
+    }
+
+    // One-off test send to any address. Mirrors production (real link if the
+    // address matches a member) but does NOT record a claim-email send.
+    if (action === 'send-test-email') {
+      const email = (req.body?.toEmail || '').toLowerCase().trim();
+      if (!EMAIL_RE.test(email)) {
+        return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+      }
+      const subj = (typeof req.body?.subject === 'string' && req.body.subject.trim()) || DEFAULT_CLAIM_SUBJECT;
+      const rawBody = (typeof req.body?.bodyHtml === 'string' && req.body.bodyHtml.trim()) || DEFAULT_CLAIM_BODY;
+
+      const match = await CommunityProfile.findOne({ email });
+      let link = `${SITE_URL}/community/manage`;
+      let firstName = 'there';
+      let lastName = '';
+      if (match) {
+        const token = crypto.randomBytes(32).toString('hex');
+        match.manageTokenHash = sha256(token);
+        match.manageTokenExpiry = new Date(Date.now() + APPROVAL_TOKEN_TTL_MS);
+        await match.save();
+        link = `${SITE_URL}/community/manage?token=${token}`;
+        firstName = match.firstName;
+        lastName = match.lastName;
+      }
+      const ctx = { firstName, lastName, link };
+      const ok = await sendRawEmail(
+        email,
+        fillTemplate(subj, ctx),
+        campaignHtml({ bodyHtml: fillTemplate(rawBody, ctx), link, buttonLabel: CLAIM_BUTTON_LABEL }),
+      );
+      return res.status(200).json({
+        success: ok,
+        message: ok ? `Test email sent to ${email}.` : 'Send failed — check the email (Resend) configuration.',
+      });
     }
 
     return res.status(400).json({ success: false, message: 'Unknown action' });
