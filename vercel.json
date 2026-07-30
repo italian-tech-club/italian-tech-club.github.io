@@ -10,6 +10,8 @@
     }
   },
   "rewrites": [
+    { "source": "/m/:slug/card.jpg", "destination": "/api/community/card?slug=:slug&format=jpg" },
+    { "source": "/m/:slug", "destination": "/api/card/:slug" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

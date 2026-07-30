@@ -19,11 +19,14 @@ import {
   Sparkles,
   Handshake,
   ArrowLeft,
+  CreditCard,
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
 import { setMemberSession, clearMemberSession, getMemberSession, memberAuthHeaders } from '../lib/memberSession';
 import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
+import { cardImageKey } from '../lib/cardArt';
+import { Credential, CardActions } from './MemberCard';
 
 const PROFILE_PIC_SIZE = 800;
 const MAX_FILE_SIZE_MB = 5;
@@ -437,11 +440,52 @@ const InviteCard = ({ inviteCode }) => {
   );
 };
 
+// The member's own card, live and shareable. Every approved member has one at
+// /m/<cardSlug> — there is nothing to switch on, so this shows the card itself
+// rather than settings for it.
+const MemberCardSection = ({ profile }) => {
+  if (!profile.cardSlug) return null;
+
+  const card = {
+    slug: profile.cardSlug,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    profession: profile.profession,
+    company: profile.company,
+    profilePic: profile.profilePic,
+    memberNumber: profile.memberNumber,
+    memberSince: profile.memberSince,
+    isFounder: profile.isFounder,
+  };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-card-ink shadow-sm">
+      <div className="px-6 pt-6 sm:px-8 sm:pt-8">
+        <h2 className="mb-2 flex items-center gap-2 text-base font-bold text-white">
+          <CreditCard className="h-5 w-5 text-itc-green" /> Your member card
+        </h2>
+        <p className="text-sm text-card-smoke">
+          Live at <span className="font-serial text-card-mute">/m/{profile.cardSlug}</span> — your name, photo,
+          what you do, and your number. Nothing else.
+        </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-8 px-6 py-8 sm:px-8 sm:py-10">
+        <Credential card={card} />
+        <CardActions card={card} />
+      </div>
+    </div>
+  );
+};
+
 // Edit / delete / change-email of own profile. Reached either with a magic-link
 // token (?token=) or with a stored member session (token = null).
 const EditProfile = ({ token }) => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  // What is actually stored, as opposed to what the form currently holds. The
+  // card is public, so it has to follow saved data and not keystrokes.
+  const [savedProfile, setSavedProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -472,6 +516,7 @@ const EditProfile = ({ token }) => {
             return;
           }
           setProfile(data.profile);
+          setSavedProfile(data.profile);
           setStats(data.stats || null);
         } else {
           if (!token) clearMemberSession(); // stale session — force the entry screen next time
@@ -486,6 +531,41 @@ const EditProfile = ({ token }) => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Keep the stored link preview matching the profile. Rendering needs a canvas
+  // and the loaded webfonts, so it can only happen in a browser — which makes
+  // this the one place it can be done: the member is here whenever the data
+  // that goes on the card changes. Sent on its own rather than folded into the
+  // profile save, so the image and a base64 photo never share a request body.
+  const storedImageKey = savedProfile?.cardImageKey;
+  const wantedImageKey = savedProfile?.cardSlug ? cardImageKey(savedProfile) : null;
+
+  useEffect(() => {
+    if (!wantedImageKey || wantedImageKey === storedImageKey) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { renderCardImage } = await import('../lib/cardArt');
+        const cardImage = await renderCardImage(savedProfile);
+        if (cancelled) return;
+        const response = await fetch(`${API_URL}/api/community/manage${authQS}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
+          body: JSON.stringify({ cardImage, cardImageKey: wantedImageKey }),
+        });
+        if (!cancelled && response.ok) {
+          setSavedProfile((prev) => (prev ? { ...prev, cardImageKey: wantedImageKey } : prev));
+        }
+      } catch {
+        // The preview endpoint falls back to the club banner until this
+        // succeeds; nothing the member is doing should fail because of it.
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedImageKey, storedImageKey]);
 
   const set = (field) => (e) => setProfile((prev) => ({ ...prev, [field]: e.target.value }));
   const toggleIn = (field) => (value) => setProfile((prev) => {
@@ -542,6 +622,7 @@ const EditProfile = ({ token }) => {
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Failed to save');
+      setSavedProfile(profile);
       setDone('saved');
     } catch (error) {
       setSaveError(error.message || 'Something went wrong. Please try again.');
@@ -760,6 +841,8 @@ const EditProfile = ({ token }) => {
           </button>
         </div>
       </div>
+
+      {savedProfile && <MemberCardSection profile={savedProfile} />}
 
       {profile.inviteCode && <InviteCard inviteCode={profile.inviteCode} />}
 

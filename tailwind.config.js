@@ -12,7 +12,23 @@ export default {
           green: '#009246',
           red: '#CE2B37',
           white: '#F1F2F1',
-        }
+        },
+        // Member card only (/m/<slug>) — a darker, metallic register than the
+        // rest of the site.
+        card: {
+          ink: '#0A0C0F',
+          panel: '#15181E',
+          brass: '#C8A55B',
+          brassHi: '#F0DFAE',
+          smoke: '#7C838E',
+          // Secondary type on the lit card face, which needs more contrast than
+          // the same role does on the flat page around it.
+          mute: '#AEB6C1',
+        },
+      },
+      fontFamily: {
+        display: ['Archivo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serial: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       backgroundSize: {
         '300%': '300%',
