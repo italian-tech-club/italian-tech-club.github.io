@@ -4,16 +4,39 @@ import { MapPin, ArrowRight, CalendarCheck, Clock, Image as ImageIcon, X, Chevro
 import { Link } from 'react-router-dom';
 import eventsData from '../data/events.json';
 import { EASE, fadeRise, hoverSpring, VIEWPORT } from '../lib/motion';
+import {
+  editionsOf,
+  expandOccurrences,
+  formatEventDate,
+  formatShortDate,
+  isRecurring,
+  lastOccurrence,
+  nextOccurrence,
+  parseLocalDate,
+  startOfToday,
+} from '../lib/eventSchedule';
 import SectionEyebrow from './SectionEyebrow';
+import SeriesCard from './SeriesCard';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 const HOMEPAGE_EVENTS_LIMIT = 4;
 
+// How many future dates of a series to show after the next one.
+const FOLLOWING_DATES = 3;
+
 const GalleryModal = ({ event, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const images = event.gallery || [];
-  const isLoading = event.loading && images.length === 0;
+  // Photos arrive grouped by night for a series, or as one unlabelled group for a
+  // single event. Either way they flatten into one strip the arrows walk through,
+  // while the dots below stay split per date.
+  const groups = event.groups || [{ label: null, images: event.gallery || [] }];
+  const slides = groups.flatMap((group, groupIndex) =>
+    group.images.map((src) => ({ src, label: group.label, groupIndex }))
+  );
+  const images = slides;
+  const isLoading = event.loading && slides.length === 0;
+  const current = slides[currentIndex];
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -41,6 +64,13 @@ const GalleryModal = ({ event, onClose }) => {
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
+  // Where each group starts in the flattened strip, so a date jumps to its first photo
+  const groupOffsets = groups.reduce((offsets, group) => {
+    const previous = offsets[offsets.length - 1];
+    offsets.push(previous + group.images.length);
+    return offsets;
+  }, [0]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -67,7 +97,7 @@ const GalleryModal = ({ event, onClose }) => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.985 }}
             transition={{ duration: 0.3, ease: EASE }}
-            src={images[currentIndex]}
+            src={current.src}
             alt={`Gallery image ${currentIndex + 1}`}
             className="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -89,18 +119,41 @@ const GalleryModal = ({ event, onClose }) => {
               <ChevronRight className="w-6 h-6" />
             </button>
             
-            <div className="absolute -bottom-12 left-0 right-0 flex justify-center gap-2">
-              {images.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(idx);
-                  }}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    idx === currentIndex ? 'bg-white w-4' : 'bg-white/30 hover:bg-white/50'
-                  }`}
-                />
+            {/* Dots stay grouped by night, each cluster under its own date */}
+            <div className="absolute -bottom-16 left-0 right-0 flex justify-center items-start gap-6">
+              {groups.map((group, groupIndex) => (
+                <div key={group.label || groupIndex} className="flex flex-col items-center gap-2">
+                  <div className="flex gap-2">
+                    {group.images.map((_, imageIndex) => {
+                      const index = groupOffsets[groupIndex] + imageIndex;
+                      return (
+                        <button
+                          key={index}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentIndex(index);
+                          }}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            index === currentIndex ? 'bg-white w-4' : 'bg-white/30 hover:bg-white/50'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  {group.label && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentIndex(groupOffsets[groupIndex]);
+                      }}
+                      className={`font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                        current?.groupIndex === groupIndex ? 'text-white' : 'text-white/40 hover:text-white/70'
+                      }`}
+                    >
+                      {group.label}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </>
@@ -109,15 +162,26 @@ const GalleryModal = ({ event, onClose }) => {
       
       <div className="absolute top-4 left-4 text-white">
         <h3 className="text-xl font-bold">{event.title}</h3>
-        <p className="text-white/60 text-sm">{images.length > 0 ? `${currentIndex + 1} / ${images.length}` : 'Loading photos…'}</p>
+        <p className="text-white/60 text-sm">
+          {slides.length === 0 ? 'Loading photos…' : (
+            <>
+              {current?.label && <span className="font-mono uppercase tracking-widest text-white/80">{current.label} · </span>}
+              {currentIndex + 1} / {slides.length}
+            </>
+          )}
+        </p>
       </div>
     </motion.div>
   );
 };
 
 const EventCard = ({ date, month, title, subtitle, location, time, type, link, isPast, delay, poster, gallery, galleryCount, onOpenGallery }) => {
+  // A poster path can be wired up before the artwork lands in the repo — fall
+  // back to the date tile instead of showing a broken image.
+  const [posterFailed, setPosterFailed] = useState(false);
+  const showPoster = poster && !posterFailed;
   const hasGallery = isPast && ((gallery?.length || 0) > 0 || (galleryCount || 0) > 0);
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -133,15 +197,16 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
     >
       {/* Media column (fixed size so poster & calendar match) */}
       <div className="flex-shrink-0 w-32 aspect-square">
-        {poster ? (
+        {showPoster ? (
           <div
             onClick={() => hasGallery && onOpenGallery()}
             className={`w-full h-full rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 ${hasGallery ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
           >
-            <img 
-              src={poster} 
-              alt={`${title} poster`} 
+            <img
+              src={poster}
+              alt={`${title} poster`}
               className="w-full h-full object-cover"
+              onError={() => setPosterFailed(true)}
             />
           </div>
         ) : (
@@ -162,7 +227,7 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
       
       <div className="flex-grow space-y-2 py-1">
         {/* Date Row (Only shown if poster exists) */}
-        {poster && (
+        {showPoster && (
           <div className={`text-sm font-bold uppercase tracking-wider mb-1 ${isPast ? 'text-slate-500 dark:text-slate-400' : 'text-itc-red'}`}>
             {month} {date}
           </div>
@@ -201,8 +266,32 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
         </div>
       </div>
 
-      <div className="flex-shrink-0 mt-4 md:mt-0 w-full md:w-auto">
-        {hasGallery ? (
+      <div className="flex-shrink-0 mt-4 md:mt-0 w-full md:w-auto flex flex-col gap-2">
+        {!isPast && !link && (
+          <span className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            {type && /members?/i.test(type) ? 'Members event' : 'Private event'}
+          </span>
+        )}
+
+        {((!isPast && link) || (isPast && !hasGallery)) && (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
+              isPast
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                  : 'bg-itc-green text-white group-hover:bg-itc-red shadow-lg shadow-itc-green/20'
+            }`}
+            onClick={isPast ? (e) => e.preventDefault() : undefined}
+          >
+            {isPast ? 'Event Ended' : 'Register Now'}
+            {!isPast && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+          </a>
+        )}
+
+        {hasGallery && (
           <button
             onClick={() => onOpenGallery()}
             className="w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-itc-green dark:hover:bg-itc-green dark:hover:text-white transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
@@ -210,26 +299,6 @@ const EventCard = ({ date, month, title, subtitle, location, time, type, link, i
             <ImageIcon className="w-4 h-4" />
             View Photos
           </button>
-        ) : !isPast && !link ? (
-          <span className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-            <Lock className="w-4 h-4 flex-shrink-0" />
-            {type && /members?/i.test(type) ? 'Members event' : 'Private event'}
-          </span>
-        ) : (
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
-              isPast 
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed' 
-                  : 'bg-itc-green text-white group-hover:bg-itc-red shadow-lg shadow-itc-green/20'
-            }`}
-            onClick={isPast ? (e) => e.preventDefault() : undefined}
-          >
-            {isPast ? 'Event Ended' : 'Register Now'} 
-            {!isPast && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-          </a>
         )}
       </div>
     </motion.div>
@@ -254,50 +323,91 @@ const Events = ({ showAll = false }) => {
     return () => { cancelled = true; };
   }, []);
 
+  const fetchGallery = async (event) => {
+    if (event.gallery?.length) return event.gallery;
+    try {
+      const res = await fetch(`${API_URL}/api/events?id=${event._id}`);
+      const data = await res.json();
+      return data.success ? (data.event.gallery || []) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  /**
+   * A series has no photos of its own — its nights do. Pull them all in one go and
+   * keep them grouped by date, most recent night first.
+   */
+  const openSeriesPhotos = async (series, editions) => {
+    const nights = [...editions]
+      .filter((edition) => (edition.galleryCount ?? edition.gallery?.length ?? 0) > 0)
+      .reverse();
+
+    setSelectedGalleryEvent({ title: series.title, groups: [], loading: true });
+
+    const groups = await Promise.all(
+      nights.map(async (night) => ({
+        label: formatShortDate(night.date),
+        images: await fetchGallery(night),
+      }))
+    );
+
+    setSelectedGalleryEvent((current) => {
+      if (!current || current.title !== series.title) return current; // modal was closed meanwhile
+      return { title: series.title, groups: groups.filter((group) => group.images.length > 0) };
+    });
+  };
+
   // Galleries are not included in the list payload (only galleryCount);
   // fetch the full event on demand when a gallery is opened.
   const openGallery = async (event) => {
-    if (event.gallery && event.gallery.length > 0) {
+    if (event.gallery?.length) {
       setSelectedGalleryEvent({ title: event.title, gallery: event.gallery });
       return;
     }
 
     setSelectedGalleryEvent({ title: event.title, gallery: [], loading: true });
-    try {
-      const res = await fetch(`${API_URL}/api/events?id=${event._id}`);
-      const data = await res.json();
-      setSelectedGalleryEvent((current) => {
-        if (!current || current.title !== event.title) return current; // modal was closed meanwhile
-        return data.success
-          ? { title: event.title, gallery: data.event.gallery || [] }
-          : null;
-      });
-    } catch {
-      setSelectedGalleryEvent((current) =>
-        current && current.title === event.title ? null : current
-      );
-    }
+    const gallery = await fetchGallery(event);
+    setSelectedGalleryEvent((current) => {
+      if (!current || current.title !== event.title) return current; // modal was closed meanwhile
+      return gallery.length > 0 ? { title: event.title, gallery } : null;
+    });
   };
 
-  // Helper function to parse date string as local date (not UTC)
-  const parseLocalDate = (dateString) => {
-    const [year, month, day] = dateString.split('-').map(Number);
-    // month is 0-indexed in JavaScript Date, so subtract 1
-    return new Date(year, month - 1, day);
-  };
-
-  // Parse events and categorize them based on current date
+  // Parse events and categorize them based on current date. A recurring series is
+  // a single document: it contributes its next gathering to Upcoming (rolling
+  // forward on its own), or its final one to Past once the series has ended.
+  // Its own past nights stay in the list as the individual events they are.
   const { upcomingEvents, pastEvents } = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+    const today = startOfToday();
 
     const upcoming = [];
     const past = [];
 
     events.forEach((event) => {
+      if (isRecurring(event)) {
+        const editions = editionsOf(events, event.series);
+        // A night that exists as its own event wins over the generated date.
+        const exclude = new Set(editions.map((edition) => edition.date));
+        const next = nextOccurrence(event, today, { exclude });
+
+        if (next) {
+          upcoming.push({
+            ...next,
+            editions: editions.filter((edition) => parseLocalDate(edition.date) < today),
+            following: expandOccurrences(event, { from: today, limit: FOLLOWING_DATES + 1, exclude })
+              .filter((occurrence) => occurrence.occurrence !== next.occurrence)
+              .slice(0, FOLLOWING_DATES),
+          });
+        } else {
+          past.push(lastOccurrence(event) || event);
+        }
+        return;
+      }
+
       const eventDate = parseLocalDate(event.date);
       eventDate.setHours(0, 0, 0, 0);
-      
+
       if (eventDate >= today) {
         upcoming.push(event);
       } else {
@@ -320,15 +430,6 @@ const Events = ({ showAll = false }) => {
   const remainingSlots = Math.max(HOMEPAGE_EVENTS_LIMIT - displayedUpcoming.length, 0);
   const displayedPast = showAll ? pastEvents : pastEvents.slice(0, remainingSlots);
   const showViewAllCTA = !showAll && totalEvents > HOMEPAGE_EVENTS_LIMIT;
-
-  // Helper function to format date for display
-  const formatEventDate = (dateString) => {
-    const date = parseLocalDate(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    const month = monthNames[date.getMonth()];
-    return { date: day, month };
-  };
 
   return (
     <section id="events" className="py-24 bg-white dark:bg-slate-950 transition-colors duration-300 relative">
@@ -354,7 +455,9 @@ const Events = ({ showAll = false }) => {
             </h2>
             <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl">
               Join our exclusive gatherings in the heart of New York City.
-              Connect with fellow Italian innovators over tech talks, aperitivos, and dinners.
+              Connect with fellow Italian innovators over tech talks, aperitivos, and dinners —
+              plus <span className="font-medium text-slate-900 dark:text-white">Il Posto Fisso</span>,
+              our standing aperitivo that comes back every three weeks.
             </p>
           </motion.div>
         </div>
@@ -367,8 +470,21 @@ const Events = ({ showAll = false }) => {
                 <div className="space-y-6">
                   {displayedUpcoming.map((event, index) => {
                     const { date, month } = formatEventDate(event.date);
+
+                    if (isRecurring(event)) {
+                      return (
+                        <SeriesCard
+                          key={event.date + event.title}
+                          event={event}
+                          editions={event.editions}
+                          following={event.following}
+                          onOpenPhotos={() => openSeriesPhotos(event, event.editions)}
+                        />
+                      );
+                    }
+
                     return (
-                      <EventCard 
+                      <EventCard
                           key={event.date + event.title}
                           date={date}
                           month={month}

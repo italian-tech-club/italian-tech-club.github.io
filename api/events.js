@@ -21,9 +21,34 @@ async function connectDB() {
   return cachedConnection;
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+// One-off changes to a recurring series: move a gathering, change its venue or
+// time, or cancel it — the "unless otherwise specified" part of a fixed cadence.
+const recurrenceOverrideSchema = new mongoose.Schema({
+  occurrence: { type: String, required: true, trim: true, match: ISO_DATE },
+  date: { type: String, trim: true, default: null },
+  time: { type: String, trim: true, maxlength: 50, default: null },
+  location: { type: String, trim: true, maxlength: 200, default: null },
+  note: { type: String, trim: true, maxlength: 200, default: null },
+  cancelled: { type: Boolean, default: false },
+}, { _id: false });
+
+// A recurring series is stored as a single event document carrying this rule;
+// individual gatherings are expanded on the client (see src/lib/eventSchedule.js).
+const recurrenceSchema = new mongoose.Schema({
+  frequency: { type: String, enum: ['weekly'], default: 'weekly' },
+  interval: { type: Number, min: 1, max: 52, default: 1 },
+  startDate: { type: String, required: true, trim: true, match: ISO_DATE },
+  until: { type: String, trim: true, default: null },
+  skipDates: { type: [String], default: [] },
+  overrides: { type: [recurrenceOverrideSchema], default: [] },
+}, { _id: false });
+
 // Schema definition
 const eventSchema = new mongoose.Schema({
-  date: { type: String, required: true, trim: true, match: /^\d{4}-\d{2}-\d{2}$/ },
+  // For a recurring series this is the first gathering; the rule drives the rest.
+  date: { type: String, required: true, trim: true, match: ISO_DATE },
   title: { type: String, required: true, trim: true, maxlength: 120 },
   subtitle: { type: String, trim: true, maxlength: 300, default: '' },
   location: { type: String, required: true, trim: true, maxlength: 200 },
@@ -33,6 +58,10 @@ const eventSchema = new mongoose.Schema({
   // poster and gallery entries hold either repo image paths or base64 data URLs
   poster: { type: String, trim: true, default: null },
   gallery: { type: [String], default: [] },
+  recurrence: { type: recurrenceSchema, default: null },
+  // Slug tying a one-off event to a series, so each night keeps its own poster
+  // and photos while still belonging to the standing appointment.
+  series: { type: String, trim: true, maxlength: 60, default: null },
 }, {
   timestamps: true,
   collection: 'events',
@@ -43,7 +72,7 @@ eventSchema.index({ date: 1, title: 1 }, { unique: true });
 // Get or create model
 const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
 
-const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery'];
+const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery', 'recurrence', 'series'];
 
 // Admin sessions created by /api/admin/auth (magic-link login)
 const adminSessionSchema = new mongoose.Schema({
@@ -75,6 +104,11 @@ function pickEventFields(body) {
   }
   if (data.gallery !== undefined && !Array.isArray(data.gallery)) {
     data.gallery = [];
+  }
+  // A rule without a start date is not a series — store null so the event is
+  // treated as a one-off rather than half-configured.
+  if (data.recurrence !== undefined && !data.recurrence?.startDate) {
+    data.recurrence = null;
   }
   return data;
 }

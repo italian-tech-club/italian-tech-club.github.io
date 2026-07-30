@@ -5,7 +5,7 @@ import { AdminSession } from '../models/AdminAuth.js';
 
 const router = express.Router();
 
-const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery'];
+const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery', 'recurrence', 'series'];
 
 async function isAuthorized(req) {
   const header = req.headers.authorization || '';
@@ -36,6 +36,11 @@ function pickEventFields(body) {
   }
   if (data.gallery !== undefined && !Array.isArray(data.gallery)) {
     data.gallery = [];
+  }
+  // A rule without a start date is not a series — store null so the event is
+  // treated as a one-off rather than half-configured.
+  if (data.recurrence !== undefined && !data.recurrence?.startDate) {
+    data.recurrence = null;
   }
   return data;
 }
