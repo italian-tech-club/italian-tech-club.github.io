@@ -1,17 +1,31 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Lock, Plus, Pencil, Trash2, X, LogOut, Loader2, Upload,
-  Calendar, MapPin, Clock, Link as LinkIcon, Image as ImageIcon, AlertCircle, CheckCircle2,
+  Calendar, MapPin, Clock, Link as LinkIcon, Image as ImageIcon, AlertCircle, CheckCircle2, Repeat,
 } from 'lucide-react';
 import { fileToResizedDataUrl } from '../utils/image';
+import { describeCadence, expandOccurrences, formatShortDate, isRecurring, nextOccurrence } from '../lib/eventSchedule';
 import AdminInquiries from './AdminInquiries';
 import AdminCommunity from './AdminCommunity';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 const STORAGE_KEY = 'itc_admin_session';
 
-const EVENT_TYPES = ['Networking', 'Talk', 'Launch Party', "Members' Dinner", "Members' Brunch"];
+const EVENT_TYPES = ['Networking', 'Talk', 'Launch Party', "Members' Dinner", "Members' Brunch", "Members' Aperitivo"];
+
+// The club's standing series runs every 3 weeks, so that's the default cadence.
+const DEFAULT_INTERVAL_WEEKS = 3;
+
+// How many upcoming gatherings the form previews.
+const PREVIEW_OCCURRENCES = 5;
+
+const EMPTY_RECURRENCE = {
+  interval: DEFAULT_INTERVAL_WEEKS,
+  until: '',
+  skipDates: [],
+  overrides: [],
+};
 
 const EMPTY_FORM = {
   date: '',
@@ -23,6 +37,8 @@ const EMPTY_FORM = {
   link: '',
   poster: '',
   gallery: [],
+  recurrence: null,
+  series: '',
 };
 
 // Vercel caps request bodies at ~4.5MB; leave headroom
@@ -43,7 +59,39 @@ const eventToForm = (event) => ({
   link: event.link || '',
   poster: event.poster || '',
   gallery: event.gallery || [],
+  series: event.series || '',
+  recurrence: event.recurrence
+    ? {
+        interval: event.recurrence.interval || DEFAULT_INTERVAL_WEEKS,
+        until: event.recurrence.until || '',
+        skipDates: event.recurrence.skipDates || [],
+        overrides: event.recurrence.overrides || [],
+      }
+    : null,
 });
+
+// The Date field doubles as the series' first gathering, so the rule's startDate
+// always mirrors it — one date to keep straight instead of two.
+const formToRecurrence = (recurrence, startDate) => {
+  if (!recurrence || !startDate) return null;
+  return {
+    frequency: 'weekly',
+    interval: Number(recurrence.interval) || 1,
+    startDate,
+    until: recurrence.until?.trim() || null,
+    skipDates: (recurrence.skipDates || []).filter(Boolean),
+    overrides: (recurrence.overrides || [])
+      .filter((override) => override.occurrence)
+      .map((override) => ({
+        occurrence: override.occurrence,
+        date: override.date?.trim() || null,
+        time: override.time?.trim() || null,
+        location: override.location?.trim() || null,
+        note: override.note?.trim() || null,
+        cancelled: !!override.cancelled,
+      })),
+  };
+};
 
 const formToPayload = (form) => ({
   date: form.date.trim(),
@@ -55,6 +103,8 @@ const formToPayload = (form) => ({
   link: form.link.trim() || null,
   poster: form.poster.trim() || null,
   gallery: form.gallery.map((entry) => entry.trim()).filter(Boolean),
+  recurrence: formToRecurrence(form.recurrence, form.date.trim()),
+  series: form.series.trim() || null,
 });
 
 const LoginGate = ({ error: externalError }) => {
@@ -143,7 +193,209 @@ const LoginGate = ({ error: externalError }) => {
   );
 };
 
-const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit }) => {
+/**
+ * Recurring-series editor. The series is one event document plus a rule; skipped
+ * dates and overrides cover the "unless otherwise specified" cases (holiday
+ * weeks, a venue change, a gathering moved by a day).
+ */
+const RecurrenceFields = ({ recurrence, startDate, onChange }) => {
+  const [skipDraft, setSkipDraft] = useState('');
+  const enabled = !!recurrence;
+
+  const rule = useMemo(() => formToRecurrence(recurrence, startDate), [recurrence, startDate]);
+
+  const preview = useMemo(
+    () => (rule ? expandOccurrences({ recurrence: rule }, { from: null, limit: PREVIEW_OCCURRENCES }) : []),
+    [rule]
+  );
+
+  const patch = (changes) => onChange({ ...recurrence, ...changes });
+
+  const addSkipDate = () => {
+    const date = skipDraft.trim();
+    if (!date || recurrence.skipDates.includes(date)) return;
+    patch({ skipDates: [...recurrence.skipDates, date].sort() });
+    setSkipDraft('');
+  };
+
+  const patchOverride = (index, changes) =>
+    patch({
+      overrides: recurrence.overrides.map((override, i) => (i === index ? { ...override, ...changes } : override)),
+    });
+
+  return (
+    <div className="md:col-span-2 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onChange(e.target.checked ? { ...EMPTY_RECURRENCE } : null)}
+          className="mt-0.5 w-4 h-4 rounded accent-itc-green"
+        />
+        <span>
+          <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+            <Repeat className="w-4 h-4" /> Recurring series
+          </span>
+          <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            The date above becomes the first gathering; the site always shows the next one.
+          </span>
+        </span>
+      </label>
+
+      {enabled && (
+        <div className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Repeats every … weeks</label>
+              <input
+                type="number"
+                min="1"
+                max="52"
+                value={recurrence.interval}
+                onChange={(e) => patch({ interval: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Ends on (optional)</label>
+              <input
+                type="date"
+                value={recurrence.until}
+                onChange={(e) => patch({ until: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {preview.length > 0 && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-bold uppercase tracking-wider">{describeCadence(rule)}</span>
+              {' — '}
+              {preview.map((occurrence) => formatShortDate(occurrence.date)).join(' · ')} …
+            </p>
+          )}
+
+          <div>
+            <label className={labelClass}>Skipped dates</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {recurrence.skipDates.map((date) => (
+                <span
+                  key={date}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                >
+                  {date}
+                  <button
+                    type="button"
+                    onClick={() => patch({ skipDates: recurrence.skipDates.filter((d) => d !== date) })}
+                    className="text-slate-400 hover:text-itc-red transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={skipDraft}
+                onChange={(e) => setSkipDraft(e.target.value)}
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={addSkipDate}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+              >
+                Skip
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+              Use the generated date (the one the cadence lands on), not the replacement.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelClass}>Exceptions ({recurrence.overrides.length})</label>
+            <div className="space-y-3">
+              {recurrence.overrides.map((override, index) => (
+                <div key={index} className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Scheduled date</span>
+                      <input
+                        type="date"
+                        value={override.occurrence || ''}
+                        onChange={(e) => patchOverride(index, { occurrence: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Moved to</span>
+                      <input
+                        type="date"
+                        value={override.date || ''}
+                        onChange={(e) => patchOverride(index, { date: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={override.time || ''}
+                    onChange={(e) => patchOverride(index, { time: e.target.value })}
+                    placeholder="Different time (optional)"
+                    className={inputClass}
+                  />
+                  <input
+                    type="text"
+                    value={override.location || ''}
+                    onChange={(e) => patchOverride(index, { location: e.target.value })}
+                    placeholder="Different venue (optional)"
+                    className={inputClass}
+                  />
+                  <input
+                    type="text"
+                    value={override.note || ''}
+                    onChange={(e) => patchOverride(index, { note: e.target.value })}
+                    placeholder="Note shown on the card, e.g. Moved for Thanksgiving"
+                    className={inputClass}
+                  />
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!override.cancelled}
+                        onChange={(e) => patchOverride(index, { cancelled: e.target.checked })}
+                        className="w-3.5 h-3.5 rounded accent-itc-red"
+                      />
+                      Cancelled
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => patch({ overrides: recurrence.overrides.filter((_, i) => i !== index) })}
+                      className="text-xs font-medium text-slate-400 hover:text-itc-red transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => patch({ overrides: [...recurrence.overrides, { occurrence: '' }] })}
+              className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add exception
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, seriesOptions = [] }) => {
   const [form, setForm] = useState(initialForm);
   const [uploading, setUploading] = useState(false);
   const [manualPath, setManualPath] = useState('');
@@ -258,6 +510,31 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit }) =
             <label className={labelClass}>Registration Link</label>
             <input type="url" value={form.link} onChange={set('link')} placeholder="https://..." className={inputClass} />
           </div>
+
+          <div className="md:col-span-2">
+            <label className={labelClass}>Series</label>
+            <input
+              type="text"
+              list="series-slugs"
+              value={form.series}
+              onChange={set('series')}
+              placeholder="e.g. posto-fisso — leave empty for a standalone event"
+              className={`${inputClass} font-mono text-xs`}
+            />
+            <datalist id="series-slugs">
+              {seriesOptions.map((slug) => <option key={slug} value={slug} />)}
+            </datalist>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+              Tag a night with the same slug as its series and its poster and photos show up on the series card.
+            </p>
+          </div>
+
+          <RecurrenceFields
+            recurrence={form.recurrence}
+            startDate={form.date}
+            onChange={(recurrence) => setForm((f) => ({ ...f, recurrence }))}
+          />
+
           <div className="md:col-span-2">
             <label className={labelClass}>Poster</label>
             <div className="flex items-start gap-3">
@@ -386,6 +663,11 @@ const AdminEvents = () => {
   const [editLoadingId, setEditLoadingId] = useState(null);
   const [toast, setToast] = useState('');
   const [tab, setTab] = useState('events');
+
+  const seriesOptions = useMemo(
+    () => [...new Set(events.map((event) => event.series).filter(Boolean))].sort(),
+    [events]
+  );
 
   const authHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -641,6 +923,18 @@ const AdminEvents = () => {
                     <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                       <Calendar className="w-3 h-3" /> {event.date}
                     </span>
+                    {isRecurring(event) && (
+                      <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-itc-green/10 text-itc-green">
+                        <Repeat className="w-3 h-3" />
+                        {describeCadence(event.recurrence)}
+                        {nextOccurrence(event) && ` · next ${formatShortDate(nextOccurrence(event).date)}`}
+                      </span>
+                    )}
+                    {event.series && (
+                      <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        {event.series}
+                      </span>
+                    )}
                     {event.time && (
                       <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                         <Clock className="w-3 h-3" /> {event.time}
@@ -696,6 +990,7 @@ const AdminEvents = () => {
             key={editing === 'new' ? 'new' : editing._id}
             initialForm={editing === 'new' ? EMPTY_FORM : eventToForm(editing)}
             isEdit={editing !== 'new'}
+            seriesOptions={seriesOptions}
             saving={saving}
             error={formError}
             onSubmit={handleSave}

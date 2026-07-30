@@ -46,6 +46,8 @@ async function migrate() {
           link: event.link ?? null,
           poster: event.poster ?? null,
           gallery: event.gallery ?? [],
+          recurrence: event.recurrence ?? null,
+          series: event.series ?? null,
         },
       },
       { upsert: true, runValidators: true }

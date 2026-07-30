@@ -1,5 +1,25 @@
 [
   {
+    "date": "2026-08-13",
+    "title": "Il Posto Fisso @ All'Antico Vinaio",
+    "subtitle": "The one date on our calendar that never moves — drop in for a panino, a glass, and whoever's around",
+    "location": "All'Antico Vinaio, 89 7th Ave S, New York, NY 10014",
+    "time": "6 PM - 8 PM",
+    "type": "Members' Aperitivo",
+    "link": null,
+    "poster": "/images/events/posto-fisso/poster.png",
+    "gallery": [],
+    "series": "posto-fisso",
+    "recurrence": {
+      "frequency": "weekly",
+      "interval": 3,
+      "startDate": "2026-08-13",
+      "until": null,
+      "skipDates": [],
+      "overrides": []
+    }
+  },
+  {
     "date": "2026-04-30",
     "title": "Meet & Eat @ Pasta Eater",
     "subtitle": "Drinks + bites with the Italian Tech Club community at Pasta Eater",
