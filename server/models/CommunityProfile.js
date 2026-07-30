@@ -89,6 +89,26 @@ const communityProfileSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Public URL segment for the shareable member card at /m/<cardSlug>.
+  // Assigned once on approval and never changed — a member may already have
+  // posted the link, so regenerating it would break a live share.
+  cardSlug: {
+    type: String,
+    default: null,
+  },
+  // 2400x1260 JPEG data URL of the card, rendered in the browser and stored so
+  // link previews have something to serve — social crawlers don't run JS, so
+  // the image has to exist before they ask for it.
+  cardImage: {
+    type: String,
+    default: null,
+  },
+  // Identity of the data `cardImage` was rendered from, so a profile edit can
+  // be detected as having invalidated it without re-rendering to compare.
+  cardImageKey: {
+    type: String,
+    default: null,
+  },
   referredBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CommunityProfile',
@@ -173,6 +193,7 @@ communityProfileSchema.index({ status: 1 });
 // Partial (not sparse) so the default nulls don't collide on uniqueness.
 communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterExpression: { memberNumber: { $type: 'number' } } });
 communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
+communityProfileSchema.index({ cardSlug: 1 }, { unique: true, partialFilterExpression: { cardSlug: { $type: 'string' } } });
 
 const CommunityProfile = mongoose.model('CommunityProfile', communityProfileSchema);
 

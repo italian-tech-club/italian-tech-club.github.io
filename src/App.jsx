@@ -23,6 +23,7 @@ import Community from './components/Community';
 import CommunityJoin from './components/CommunityJoin';
 import CommunityManage from './components/CommunityManage';
 import CommunityConnect from './components/CommunityConnect';
+import MemberCard from './components/MemberCard';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
 
@@ -80,6 +81,7 @@ function App() {
       <Route path="/community/join" element={<CommunityJoin />} />
       <Route path="/community/manage" element={<CommunityManage />} />
       <Route path="/community/connect" element={<CommunityConnect />} />
+      <Route path="/m/:slug" element={<MemberCard />} />
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />

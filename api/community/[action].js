@@ -10,6 +10,7 @@ import crypto from 'crypto';
  *   GET|DELETE /api/community/session       (member session check / sign-out)
  *   GET|POST /api/community/connect         (double-opt-in member intros)
  *   POST   /api/community/view              (profile view tracking, member only)
+ *   GET    /api/community/card              (public: shareable member card)
  *   POST   /api/community/claim-request
  *   GET|POST /api/community/admin           (admin session required)
  * The segment after /community/ arrives as req.query.action.
@@ -55,6 +56,9 @@ const communityProfileSchema = new mongoose.Schema({
   memberNumber: { type: Number, default: null },
   viewCount: { type: Number, default: 0 },
   inviteCode: { type: String, default: null },
+  cardSlug: { type: String, default: null },
+  cardImage: { type: String, default: null },
+  cardImageKey: { type: String, default: null },
   referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityProfile', default: null },
   status: { type: String, enum: ['unclaimed', 'pending', 'approved', 'inactive'], default: 'pending' },
   emailVerified: { type: Boolean, default: false },
@@ -75,6 +79,7 @@ const communityProfileSchema = new mongoose.Schema({
 });
 communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterExpression: { memberNumber: { $type: 'number' } } });
 communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
+communityProfileSchema.index({ cardSlug: 1 }, { unique: true, partialFilterExpression: { cardSlug: { $type: 'string' } } });
 
 const emailClaimRequestSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
@@ -162,7 +167,7 @@ const SITE_URL = process.env.SITE_URL || 'https://italiantechclubnyc.com';
 const FROM_EMAIL = process.env.SPONSOR_FROM_EMAIL || 'ITC Website <onboarding@resend.dev>';
 // Where new-application notifications are sent (the club's shared inbox).
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || 'ciao@italiantechclubnyc.com';
-const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect'];
+const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect', 'cardImage', 'cardImageKey'];
 const MEMBER_VIEW_FIELDS = 'firstName lastName linkedIn profilePic profession company bio isFounder roles lookingFor openToConnect memberNumber createdAt';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -333,6 +338,30 @@ async function findMemberSession(req) {
 
 // Approved members get a sequential member number and an invite code, assigned
 // once (on approval, claim, or first sign-in after this feature shipped).
+// "Giuseppe D'Anno" -> "giuseppe-danno". Strips accents so Italian names keep
+// their readable ASCII form in the URL.
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+// The member number is already unique, so it is the natural tiebreaker for two
+// members sharing a name.
+async function assignCardSlug(profile) {
+  const base = slugify(`${profile.firstName} ${profile.lastName}`);
+  if (base) {
+    const taken = await CommunityProfile.findOne({ cardSlug: base }).select('_id');
+    if (!taken) return base;
+    return `${base}-${profile.memberNumber}`;
+  }
+  return `member-${profile.memberNumber}`;
+}
+
 async function ensureMemberExtras(profile) {
   if (profile.status !== 'approved') return;
   let changed = false;
@@ -342,6 +371,11 @@ async function ensureMemberExtras(profile) {
   }
   if (!profile.inviteCode) {
     profile.inviteCode = crypto.randomBytes(6).toString('base64url');
+    changed = true;
+  }
+  // Assigned once and kept forever: the member may already have shared the URL.
+  if (!profile.cardSlug) {
+    profile.cardSlug = await assignCardSlug(profile);
     changed = true;
   }
   if (changed) await profile.save();
@@ -835,6 +869,9 @@ async function handleManage(req, res) {
         openToConnect: profile.openToConnect,
         memberNumber: profile.memberNumber,
         inviteCode: profile.inviteCode,
+        cardSlug: profile.cardSlug,
+        cardImageKey: profile.cardImageKey,
+        memberSince: profile.createdAt ? new Date(profile.createdAt).getUTCFullYear() : null,
       },
       stats: { totalViews: profile.viewCount || 0, viewsLast7Days },
       ...(session ? {
@@ -864,6 +901,58 @@ async function handleManage(req, res) {
   }
 
   return res.status(405).json({ success: false, message: 'Method not allowed' });
+}
+
+// ---- GET /api/community/card?slug=<cardSlug> ----
+// Public on purpose: this backs the shareable member card at /m/<slug>. Only
+// fields the member agreed to publish are returned — never the email.
+async function handleCard(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ success: false, message: 'Method not allowed' });
+
+  const slug = String(req.query.slug || '').trim().toLowerCase();
+  if (!slug) return res.status(400).json({ success: false, message: 'Missing slug' });
+
+  // ?format=jpg streams the stored link-preview image. Rewritten to the tidy
+  // /m/<slug>/card.jpg in vercel.json — that is the URL crawlers fetch.
+  if (req.query.format === 'jpg') {
+    const withImage = await CommunityProfile.findOne({ cardSlug: slug, status: 'approved' })
+      .select('cardImage');
+    const dataUrl = withImage?.cardImage || '';
+    const prefix = 'data:image/jpeg;base64,';
+    const base64 = dataUrl.startsWith(prefix) ? dataUrl.slice(prefix.length) : '';
+    if (!base64) {
+      // No render stored yet — fall back to the club banner so the share still
+      // previews as something rather than a broken image.
+      res.setHeader('Location', `${SITE_URL}/og-image.png`);
+      return res.status(302).end();
+    }
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
+    return res.status(200).send(Buffer.from(base64, 'base64'));
+  }
+
+  const profile = await CommunityProfile.findOne({ cardSlug: slug, status: 'approved' })
+    .select('firstName lastName profession company profilePic roles linkedIn isFounder memberNumber cardSlug createdAt');
+
+  if (!profile) return res.status(404).json({ success: false, message: 'No member record at this address.' });
+
+  return res.status(200).json({ success: true, card: publicCard(profile) });
+}
+
+function publicCard(profile) {
+  return {
+    slug: profile.cardSlug,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    profession: profile.profession,
+    company: profile.company || '',
+    profilePic: profile.profilePic || null,
+    roles: profile.roles || [],
+    linkedIn: profile.linkedIn || '',
+    isFounder: !!profile.isFounder,
+    memberNumber: profile.memberNumber,
+    memberSince: profile.createdAt ? new Date(profile.createdAt).getUTCFullYear() : null,
+  };
 }
 
 // ---- POST /api/community/claim-request ----
@@ -1175,6 +1264,7 @@ export default async function handler(req, res) {
       case 'session': return await handleSession(req, res);
       case 'connect': return await handleConnect(req, res);
       case 'view': return await handleView(req, res);
+      case 'card': return await handleCard(req, res);
       case 'claim-request': return await handleClaimRequest(req, res);
       case 'admin': return await handleAdmin(req, res);
       default: return res.status(404).json({ success: false, message: 'Not found' });

@@ -19,7 +19,7 @@ const CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_PENDING_CONNECTS = 3; // outgoing pending requests per member
 // Where new-application notifications are sent (the club's shared inbox).
 const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || 'ciao@italiantechclubnyc.com';
-const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect'];
+const EDITABLE_FIELDS = ['firstName', 'lastName', 'linkedIn', 'profilePic', 'profession', 'company', 'bio', 'roles', 'lookingFor', 'openToConnect', 'cardImage', 'cardImageKey'];
 // Fields members see about each other in the directory.
 const MEMBER_VIEW_FIELDS = 'firstName lastName linkedIn profilePic profession company bio isFounder roles lookingFor openToConnect memberNumber createdAt';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -65,8 +65,32 @@ async function findMemberSession(req) {
   return { session, profile };
 }
 
-// Approved members get a sequential member number and an invite code, assigned
-// once (on approval, claim, or first sign-in after this feature shipped).
+// "Giuseppe D'Anno" -> "giuseppe-danno". Strips accents so Italian names keep
+// their readable ASCII form in the URL.
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+// The member number is already unique, so it is the natural tiebreaker for two
+// members sharing a name.
+async function assignCardSlug(profile) {
+  const base = slugify(`${profile.firstName} ${profile.lastName}`);
+  if (base) {
+    const taken = await CommunityProfile.findOne({ cardSlug: base }).select('_id');
+    if (!taken) return base;
+    return `${base}-${profile.memberNumber}`;
+  }
+  return `member-${profile.memberNumber}`;
+}
+
+// Approved members get a sequential member number, an invite code, and a card
+// slug, assigned once (on approval, claim, or first sign-in after this shipped).
 async function ensureMemberExtras(profile) {
   if (profile.status !== 'approved') return;
   let changed = false;
@@ -76,6 +100,11 @@ async function ensureMemberExtras(profile) {
   }
   if (!profile.inviteCode) {
     profile.inviteCode = crypto.randomBytes(6).toString('base64url');
+    changed = true;
+  }
+  // Assigned once and kept forever: the member may already have shared the URL.
+  if (!profile.cardSlug) {
+    profile.cardSlug = await assignCardSlug(profile);
     changed = true;
   }
   if (changed) await profile.save();
@@ -502,6 +531,9 @@ router.get('/manage', async (req, res) => {
         openToConnect: profile.openToConnect,
         memberNumber: profile.memberNumber,
         inviteCode: profile.inviteCode,
+        cardSlug: profile.cardSlug,
+        cardImageKey: profile.cardImageKey,
+        memberSince: profile.createdAt ? new Date(profile.createdAt).getUTCFullYear() : null,
       },
       stats: { totalViews: profile.viewCount || 0, viewsLast7Days },
       ...(session ? {
@@ -764,6 +796,56 @@ router.post('/view', async (req, res) => {
     // Duplicate upsert race is fine — the view is already counted.
     if (error.code === 11000) return res.json({ success: true, counted: false });
     console.error('❌ View tracking error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong.' });
+  }
+});
+
+/**
+ * GET /api/community/card?slug=<cardSlug>
+ * Public on purpose: this backs the shareable member card at /m/<slug>. Only
+ * fields the member agreed to publish are returned — never the email.
+ */
+router.get('/card', async (req, res) => {
+  try {
+    const slug = String(req.query.slug || '').trim().toLowerCase();
+    if (!slug) return res.status(400).json({ success: false, message: 'Missing slug' });
+
+    // ?format=jpg streams the stored link-preview image (see vercel.json).
+    if (req.query.format === 'jpg') {
+      const withImage = await CommunityProfile.findOne({ cardSlug: slug, status: 'approved' })
+        .select('cardImage');
+      const dataUrl = withImage?.cardImage || '';
+      const prefix = 'data:image/jpeg;base64,';
+      const base64 = dataUrl.startsWith(prefix) ? dataUrl.slice(prefix.length) : '';
+      if (!base64) return res.redirect(302, `${SITE_URL}/og-image.png`);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
+      return res.status(200).send(Buffer.from(base64, 'base64'));
+    }
+
+    const profile = await CommunityProfile.findOne({ cardSlug: slug, status: 'approved' })
+      .select('firstName lastName profession company profilePic roles linkedIn isFounder memberNumber cardSlug createdAt');
+
+    if (!profile) return res.status(404).json({ success: false, message: 'No member record at this address.' });
+
+    return res.json({
+      success: true,
+      card: {
+        slug: profile.cardSlug,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        profession: profile.profession,
+        company: profile.company || '',
+        profilePic: profile.profilePic || null,
+        roles: profile.roles || [],
+        linkedIn: profile.linkedIn || '',
+        isFounder: !!profile.isFounder,
+        memberNumber: profile.memberNumber,
+        memberSince: profile.createdAt ? new Date(profile.createdAt).getUTCFullYear() : null,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Card fetch error:', error);
     return res.status(500).json({ success: false, message: 'Something went wrong.' });
   }
 });
