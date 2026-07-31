@@ -575,7 +575,7 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-start md:items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onCancel}
     >
       <motion.form
@@ -583,9 +583,9 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
         animate={{ opacity: 1, y: 0 }}
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl my-8 p-6 md:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl"
+        className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl"
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex-shrink-0 flex items-center justify-between gap-2 px-5 md:px-8 py-4 border-b border-slate-200 dark:border-slate-800">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
             {isEdit ? 'Edit ' : 'New '}{isSeries ? 'Series' : 'Event'}
           </h2>
@@ -594,191 +594,195 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Date *</label>
-            <input type="date" required value={form.date} onChange={set('date')} className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Type *</label>
-            <input
-              type="text"
-              required
-              list="event-types"
-              value={form.type}
-              onChange={set('type')}
-              placeholder="e.g. Networking"
-              className={inputClass}
-            />
-            <datalist id="event-types">
-              {EVENT_TYPES.map((t) => <option key={t} value={t} />)}
-            </datalist>
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelClass}>Title *</label>
-            <input type="text" required value={form.title} onChange={set('title')} placeholder="Event title" className={inputClass} />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelClass}>Subtitle</label>
-            <input type="text" value={form.subtitle} onChange={set('subtitle')} placeholder="Short description shown under the title" className={inputClass} />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelClass}>Location *</label>
-            <input type="text" required value={form.location} onChange={set('location')} placeholder="Venue, street address, city" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Time</label>
-            <input type="text" value={form.time} onChange={set('time')} placeholder="e.g. 6:30 PM - 8:30 PM" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Registration Link</label>
-            <input type="url" value={form.link} onChange={set('link')} placeholder="https://..." className={inputClass} />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className={labelClass}>Series {isSeries && '*'}</label>
-            <input
-              type="text"
-              list="series-slugs"
-              required={isSeries}
-              value={form.series}
-              onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, series: slugifyWhileTyping(e.target.value) })); }}
-              placeholder="e.g. posto-fisso — leave empty for a standalone event"
-              className={`${inputClass} font-mono text-xs`}
-            />
-            <datalist id="series-slugs">
-              {seriesOptions.map((slug) => <option key={slug} value={slug} />)}
-            </datalist>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-              {isSeries
-                ? 'The slug that ties this series to its nights. Taken from the title — change it if you like.'
-                : 'Tag a night with the same slug as its series and its poster and photos show up on the series card.'}
-            </p>
-          </div>
-
-          <RecurrenceFields
-            recurrence={form.recurrence}
-            startDate={form.date}
-            onChange={(recurrence) => setForm((f) => ({ ...f, recurrence }))}
-          />
-
-          {isSeries && (
-            <EditionPicker
-              slug={form.series}
-              candidates={candidates}
-              selectedIds={form.editionIds}
-              onChange={(editionIds) => setForm((f) => ({ ...f, editionIds }))}
-            />
-          )}
-
-          <div className="md:col-span-2">
-            <label className={labelClass}>Poster</label>
-            <div className="flex items-start gap-3">
-              {form.poster && (
-                <div className="relative w-24 h-24 flex-shrink-0">
-                  <img
-                    src={form.poster}
-                    alt="Poster preview"
-                    className="w-full h-full object-cover rounded-xl border border-slate-200 dark:border-slate-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, poster: '' }))}
-                    className="absolute -top-2 -right-2 p-1 rounded-full bg-itc-red text-white shadow"
-                    title="Remove poster"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-              <div className="flex-grow space-y-2">
-                <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors">
-                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  Upload image
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePosterFile} />
-                </label>
-                {!form.poster.startsWith('data:') && (
-                  <input
-                    type="text"
-                    value={form.poster}
-                    onChange={set('poster')}
-                    placeholder="…or a repo path / URL: /images/events/my-event/poster.png"
-                    className={inputClass}
-                  />
-                )}
-              </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 md:px-8 py-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Date *</label>
+              <input type="date" required value={form.date} onChange={set('date')} className={inputClass} />
             </div>
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelClass}>Gallery ({form.gallery.length} photo{form.gallery.length === 1 ? '' : 's'})</label>
-            <div className="flex flex-wrap gap-3">
-              {form.gallery.map((src, idx) => (
-                <div key={idx} className="relative w-20 h-20">
-                  <img
-                    src={src}
-                    alt={`Gallery ${idx + 1}`}
-                    className="w-full h-full object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeGalleryImage(idx)}
-                    className="absolute -top-2 -right-2 p-1 rounded-full bg-itc-red text-white shadow"
-                    title="Remove photo"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              <label className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 hover:border-itc-green hover:text-itc-green cursor-pointer transition-colors">
-                {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryFiles} />
-              </label>
-            </div>
-            <div className="flex gap-2 mt-3">
+            <div>
+              <label className={labelClass}>Type *</label>
               <input
                 type="text"
-                value={manualPath}
-                onChange={(e) => setManualPath(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addManualPath(); } }}
-                placeholder="…or add a repo path / URL: /images/events/my-event/img1.jpg"
+                required
+                list="event-types"
+                value={form.type}
+                onChange={set('type')}
+                placeholder="e.g. Networking"
+                className={inputClass}
+              />
+              <datalist id="event-types">
+                {EVENT_TYPES.map((t) => <option key={t} value={t} />)}
+              </datalist>
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass}>Title *</label>
+              <input type="text" required value={form.title} onChange={set('title')} placeholder="Event title" className={inputClass} />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass}>Subtitle</label>
+              <input type="text" value={form.subtitle} onChange={set('subtitle')} placeholder="Short description shown under the title" className={inputClass} />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass}>Location *</label>
+              <input type="text" required value={form.location} onChange={set('location')} placeholder="Venue, street address, city" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Time</label>
+              <input type="text" value={form.time} onChange={set('time')} placeholder="e.g. 6:30 PM - 8:30 PM" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Registration Link</label>
+              <input type="url" value={form.link} onChange={set('link')} placeholder="https://..." className={inputClass} />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className={labelClass}>Series {isSeries && '*'}</label>
+              <input
+                type="text"
+                list="series-slugs"
+                required={isSeries}
+                value={form.series}
+                onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, series: slugifyWhileTyping(e.target.value) })); }}
+                placeholder="e.g. posto-fisso — leave empty for a standalone event"
                 className={`${inputClass} font-mono text-xs`}
               />
-              <button
-                type="button"
-                onClick={addManualPath}
-                className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
-              >
-                Add
-              </button>
+              <datalist id="series-slugs">
+                {seriesOptions.map((slug) => <option key={slug} value={slug} />)}
+              </datalist>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                {isSeries
+                  ? 'The slug that ties this series to its nights. Taken from the title — change it if you like.'
+                  : 'Tag a night with the same slug as its series and its poster and photos show up on the series card.'}
+              </p>
             </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-              Uploaded photos are compressed and stored in the database — no repo commit needed.
-            </p>
+
+            <RecurrenceFields
+              recurrence={form.recurrence}
+              startDate={form.date}
+              onChange={(recurrence) => setForm((f) => ({ ...f, recurrence }))}
+            />
+
+            {isSeries && (
+              <EditionPicker
+                slug={form.series}
+                candidates={candidates}
+                selectedIds={form.editionIds}
+                onChange={(editionIds) => setForm((f) => ({ ...f, editionIds }))}
+              />
+            )}
+
+            <div className="md:col-span-2">
+              <label className={labelClass}>Poster</label>
+              <div className="flex items-start gap-3">
+                {form.poster && (
+                  <div className="relative w-24 h-24 flex-shrink-0">
+                    <img
+                      src={form.poster}
+                      alt="Poster preview"
+                      className="w-full h-full object-cover rounded-xl border border-slate-200 dark:border-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, poster: '' }))}
+                      className="absolute -top-2 -right-2 p-1 rounded-full bg-itc-red text-white shadow"
+                      title="Remove poster"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex-grow space-y-2">
+                  <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors">
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Upload image
+                    <input type="file" accept="image/*" className="hidden" onChange={handlePosterFile} />
+                  </label>
+                  {!form.poster.startsWith('data:') && (
+                    <input
+                      type="text"
+                      value={form.poster}
+                      onChange={set('poster')}
+                      placeholder="…or a repo path / URL: /images/events/my-event/poster.png"
+                      className={inputClass}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelClass}>Gallery ({form.gallery.length} photo{form.gallery.length === 1 ? '' : 's'})</label>
+              <div className="flex flex-wrap gap-3">
+                {form.gallery.map((src, idx) => (
+                  <div key={idx} className="relative w-20 h-20">
+                    <img
+                      src={src}
+                      alt={`Gallery ${idx + 1}`}
+                      className="w-full h-full object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryImage(idx)}
+                      className="absolute -top-2 -right-2 p-1 rounded-full bg-itc-red text-white shadow"
+                      title="Remove photo"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <label className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 hover:border-itc-green hover:text-itc-green cursor-pointer transition-colors">
+                  {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryFiles} />
+                </label>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="text"
+                  value={manualPath}
+                  onChange={(e) => setManualPath(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addManualPath(); } }}
+                  placeholder="…or add a repo path / URL: /images/events/my-event/img1.jpg"
+                  className={`${inputClass} font-mono text-xs`}
+                />
+                <button
+                  type="button"
+                  onClick={addManualPath}
+                  className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                Uploaded photos are compressed and stored in the database — no repo commit needed.
+              </p>
+            </div>
           </div>
         </div>
 
-        {error && (
-          <p className="flex items-center gap-2 text-sm text-itc-red mt-4">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-          </p>
-        )}
+        <div className="flex-shrink-0 px-5 md:px-8 py-4 border-t border-slate-200 dark:border-slate-800">
+          {error && (
+            <p className="flex items-center gap-2 text-sm text-itc-red mb-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+            </p>
+          )}
 
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-6 py-2.5 rounded-full text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving || uploading}
-            className="px-6 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isEdit ? 'Save Changes' : isSeries ? 'Create Series' : 'Create Event'}
-          </button>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-6 py-2.5 rounded-full text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || uploading}
+              className="px-6 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isEdit ? 'Save Changes' : isSeries ? 'Create Series' : 'Create Event'}
+            </button>
+          </div>
         </div>
       </motion.form>
     </motion.div>
