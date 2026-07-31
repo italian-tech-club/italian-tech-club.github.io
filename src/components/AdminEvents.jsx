@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Lock, Plus, Pencil, Trash2, X, LogOut, Loader2, Upload,
-  Calendar, MapPin, Clock, Link as LinkIcon, Image as ImageIcon, AlertCircle, CheckCircle2, Repeat,
+  Calendar, MapPin, Clock, Link as LinkIcon, Image as ImageIcon, AlertCircle, CheckCircle2, Repeat, Images,
 } from 'lucide-react';
 import { fileToResizedDataUrl } from '../utils/image';
 import { describeCadence, expandOccurrences, formatShortDate, isRecurring, nextOccurrence } from '../lib/eventSchedule';
@@ -39,7 +39,33 @@ const EMPTY_FORM = {
   gallery: [],
   recurrence: null,
   series: '',
+  // Ids of the past nights tagged into this series — the photo carousel's source.
+  editionIds: [],
 };
+
+// A series starts life with the cadence already switched on.
+const NEW_SERIES_FORM = { ...EMPTY_FORM, recurrence: { ...EMPTY_RECURRENCE } };
+
+const NEW_EVENT = 'new';
+const NEW_SERIES = 'new-series';
+const isDraft = (editing) => editing === NEW_EVENT || editing === NEW_SERIES;
+
+// Series slugs are typed by hand into past events too, so keep them boring:
+// lowercase, dashes, no accents.
+const slugify = (value) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+
+// Same shape, but a trailing dash survives: otherwise typing a space between two
+// words would glue them together as you type.
+const slugifyWhileTyping = (value) => slugify(value) + (/[^a-z0-9]$/i.test(value) ? '-' : '');
+
+const photoCountOf = (event) => event.galleryCount ?? event.gallery?.length ?? 0;
 
 // Vercel caps request bodies at ~4.5MB; leave headroom
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
@@ -49,7 +75,7 @@ const inputClass =
 
 const labelClass = 'block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5';
 
-const eventToForm = (event) => ({
+const eventToForm = (event, allEvents = []) => ({
   date: event.date || '',
   title: event.title || '',
   subtitle: event.subtitle || '',
@@ -68,6 +94,9 @@ const eventToForm = (event) => ({
         overrides: event.recurrence.overrides || [],
       }
     : null,
+  editionIds: event.series
+    ? allEvents.filter((other) => other.series === event.series && !isRecurring(other)).map((other) => other._id)
+    : [],
 });
 
 // The Date field doubles as the series' first gathering, so the rule's startDate
@@ -104,7 +133,7 @@ const formToPayload = (form) => ({
   poster: form.poster.trim() || null,
   gallery: form.gallery.map((entry) => entry.trim()).filter(Boolean),
   recurrence: formToRecurrence(form.recurrence, form.date.trim()),
-  series: form.series.trim() || null,
+  series: slugify(form.series) || null,
 });
 
 const LoginGate = ({ error: externalError }) => {
@@ -395,12 +424,99 @@ const RecurrenceFields = ({ recurrence, startDate, onChange }) => {
   );
 };
 
-const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, seriesOptions = [] }) => {
+/**
+ * Picks which already-run nights belong to this series. A series document has no
+ * photos of its own — the carousel on its card is the galleries of the nights
+ * tagged here, kept grouped by date. Checking a night writes the series slug onto
+ * that event; unchecking clears it. Its own Past Events card is unaffected.
+ */
+const EditionPicker = ({ slug, candidates, selectedIds, onChange }) => {
+  const selected = new Set(selectedIds);
+  const photoTotal = candidates
+    .filter((event) => selected.has(event._id))
+    .reduce((sum, event) => sum + photoCountOf(event), 0);
+
+  const toggle = (id) =>
+    onChange(selected.has(id) ? selectedIds.filter((other) => other !== id) : [...selectedIds, id]);
+
+  return (
+    <div className="md:col-span-2 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+      <span className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+        <Images className="w-4 h-4" /> Nights in this series
+      </span>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+        Their photos become the series&apos; carousel, grouped by night. Each night keeps its own Past Events card.
+      </p>
+
+      {!slug && (
+        <p className="text-xs text-itc-red mt-3">Give the series a slug above before linking nights.</p>
+      )}
+
+      {slug && candidates.length === 0 && (
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">No other events to link yet.</p>
+      )}
+
+      {slug && candidates.length > 0 && (
+        <>
+          <div className="mt-3 max-h-64 overflow-y-auto space-y-1.5 pr-1">
+            {candidates.map((event) => {
+              const photos = photoCountOf(event);
+              const otherSeries = event.series && event.series !== slug;
+              return (
+                <label
+                  key={event._id}
+                  className="flex items-center gap-3 p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-itc-green/40 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(event._id)}
+                    onChange={() => toggle(event._id)}
+                    className="w-4 h-4 rounded accent-itc-green flex-shrink-0"
+                  />
+                  <span className="flex-grow min-w-0">
+                    <span className="block text-sm font-medium text-slate-900 dark:text-white truncate">{event.title}</span>
+                    <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      {event.date}
+                      <span className="flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3" /> {photos}
+                      </span>
+                      {otherSeries && (
+                        <span className="font-mono text-[11px] text-itc-red">in {event.series}</span>
+                      )}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2.5">
+            <span className="font-bold">{selectedIds.length}</span> night{selectedIds.length === 1 ? '' : 's'} linked
+            {' · '}
+            <span className="font-bold">{photoTotal}</span> photo{photoTotal === 1 ? '' : 's'} in the carousel
+          </p>
+        </>
+      )}
+    </div>
+  );
+};
+
+const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, seriesOptions = [], candidates = [] }) => {
   const [form, setForm] = useState(initialForm);
   const [uploading, setUploading] = useState(false);
   const [manualPath, setManualPath] = useState('');
+  // A hand-edited slug is never overwritten by the title autofill.
+  const [slugTouched, setSlugTouched] = useState(!!initialForm.series);
+
+  const isSeries = !!form.recurrence;
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  // A series with no slug can't gather its nights, so derive one from the title
+  // until the slug is edited by hand.
+  useEffect(() => {
+    if (!isSeries || slugTouched) return;
+    setForm((f) => ({ ...f, series: slugify(f.title) }));
+  }, [form.title, isSeries, slugTouched]);
 
   const handlePosterFile = async (e) => {
     const file = e.target.files?.[0];
@@ -463,7 +579,7 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            {isEdit ? 'Edit Event' : 'New Event'}
+            {isEdit ? 'Edit ' : 'New '}{isSeries ? 'Series' : 'Event'}
           </h2>
           <button type="button" onClick={onCancel} className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
             <X className="w-5 h-5" />
@@ -512,12 +628,13 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
           </div>
 
           <div className="md:col-span-2">
-            <label className={labelClass}>Series</label>
+            <label className={labelClass}>Series {isSeries && '*'}</label>
             <input
               type="text"
               list="series-slugs"
+              required={isSeries}
               value={form.series}
-              onChange={set('series')}
+              onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, series: slugifyWhileTyping(e.target.value) })); }}
               placeholder="e.g. posto-fisso — leave empty for a standalone event"
               className={`${inputClass} font-mono text-xs`}
             />
@@ -525,7 +642,9 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
               {seriesOptions.map((slug) => <option key={slug} value={slug} />)}
             </datalist>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-              Tag a night with the same slug as its series and its poster and photos show up on the series card.
+              {isSeries
+                ? 'The slug that ties this series to its nights. Taken from the title — change it if you like.'
+                : 'Tag a night with the same slug as its series and its poster and photos show up on the series card.'}
             </p>
           </div>
 
@@ -534,6 +653,15 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
             startDate={form.date}
             onChange={(recurrence) => setForm((f) => ({ ...f, recurrence }))}
           />
+
+          {isSeries && (
+            <EditionPicker
+              slug={form.series}
+              candidates={candidates}
+              selectedIds={form.editionIds}
+              onChange={(editionIds) => setForm((f) => ({ ...f, editionIds }))}
+            />
+          )}
 
           <div className="md:col-span-2">
             <label className={labelClass}>Poster</label>
@@ -641,7 +769,7 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
             className="px-6 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isEdit ? 'Save Changes' : 'Create Event'}
+            {isEdit ? 'Save Changes' : isSeries ? 'Create Series' : 'Create Event'}
           </button>
         </div>
       </motion.form>
@@ -667,6 +795,13 @@ const AdminEvents = () => {
   const seriesOptions = useMemo(
     () => [...new Set(events.map((event) => event.series).filter(Boolean))].sort(),
     [events]
+  );
+
+  // Nights a series can gather: ordinary events, most recent first. A series
+  // document is never a night of another series, and never of itself.
+  const editionCandidates = useMemo(
+    () => events.filter((event) => !isRecurring(event) && event._id !== editing?._id),
+    [events, editing]
   );
 
   const authHeaders = useCallback(() => ({
@@ -756,9 +891,44 @@ const AdminEvents = () => {
     }
   };
 
+  /**
+   * Write the series slug onto the nights the picker checked, and clear it from
+   * the ones it unchecked. Only the `series` field is sent, so each night keeps
+   * its own gallery (the list rows don't carry one).
+   * @returns {number} nights that could not be updated
+   */
+  const syncEditions = async (slug, selectedIds, previousSlug) => {
+    const selected = new Set(selectedIds);
+
+    const changes = events.flatMap((event) => {
+      if (isRecurring(event)) return [];
+      if (selected.has(event._id)) {
+        return event.series === slug ? [] : [{ id: event._id, series: slug }];
+      }
+      const wasOurs = event.series && (event.series === slug || event.series === previousSlug);
+      return wasOurs ? [{ id: event._id, series: null }] : [];
+    });
+
+    const results = await Promise.all(changes.map(async ({ id, series }) => {
+      try {
+        const response = await fetch(`${API_URL}/api/events?id=${id}`, {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ series }),
+        });
+        const data = await response.json();
+        return response.ok && data.success;
+      } catch {
+        return false;
+      }
+    }));
+
+    return results.filter((ok) => !ok).length;
+  };
+
   const handleSave = async (form) => {
     setFormError('');
-    const isEdit = editing !== 'new';
+    const isEdit = !isDraft(editing);
 
     const payload = JSON.stringify(formToPayload(form));
     const payloadBytes = new Blob([payload]).size;
@@ -784,8 +954,20 @@ const AdminEvents = () => {
         return;
       }
 
+      const saved = formToPayload(form);
+      const isSeries = !!saved.recurrence;
+      let failures = 0;
+      if (isSeries && saved.series) {
+        failures = await syncEditions(saved.series, form.editionIds || [], isEdit ? editing.series : null);
+      }
+
       setEditing(null);
-      showToast(isEdit ? 'Event updated' : 'Event created');
+      const noun = isSeries ? 'Series' : 'Event';
+      showToast(
+        failures > 0
+          ? `${noun} saved, but ${failures} night${failures === 1 ? '' : 's'} could not be linked`
+          : `${noun} ${isEdit ? 'updated' : 'created'}`
+      );
       fetchEvents();
     } catch {
       setFormError('Could not reach the server. Please try again.');
@@ -851,12 +1033,20 @@ const AdminEvents = () => {
           </div>
           <div className="flex items-center gap-3">
             {tab === 'events' && (
-              <button
-                onClick={() => { setFormError(''); setEditing('new'); }}
-                className="px-5 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors flex items-center gap-2 shadow-lg shadow-itc-green/20"
-              >
-                <Plus className="w-4 h-4" /> New Event
-              </button>
+              <>
+                <button
+                  onClick={() => { setFormError(''); setEditing(NEW_SERIES); }}
+                  className="px-5 py-2.5 rounded-full text-sm font-bold border border-itc-green/40 text-itc-green hover:bg-itc-green hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <Repeat className="w-4 h-4" /> New Series
+                </button>
+                <button
+                  onClick={() => { setFormError(''); setEditing(NEW_EVENT); }}
+                  className="px-5 py-2.5 rounded-full text-sm font-bold bg-itc-green text-white hover:bg-itc-red transition-colors flex items-center gap-2 shadow-lg shadow-itc-green/20"
+                >
+                  <Plus className="w-4 h-4" /> New Event
+                </button>
+              </>
             )}
             <button
               onClick={handleLogout}
@@ -987,10 +1177,15 @@ const AdminEvents = () => {
       <AnimatePresence>
         {editing && (
           <EventForm
-            key={editing === 'new' ? 'new' : editing._id}
-            initialForm={editing === 'new' ? EMPTY_FORM : eventToForm(editing)}
-            isEdit={editing !== 'new'}
+            key={isDraft(editing) ? editing : editing._id}
+            initialForm={
+              editing === NEW_EVENT ? EMPTY_FORM
+                : editing === NEW_SERIES ? NEW_SERIES_FORM
+                  : eventToForm(editing, events)
+            }
+            isEdit={!isDraft(editing)}
             seriesOptions={seriesOptions}
+            candidates={editionCandidates}
             saving={saving}
             error={formError}
             onSubmit={handleSave}
