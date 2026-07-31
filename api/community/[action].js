@@ -314,26 +314,60 @@ async function applyClaim(profile) {
   if (changed) await profile.save();
 }
 
-async function isAuthorized(req) {
+// Mirrors the allowlist in /api/admin/auth — a member session only carries
+// admin rights if its email is on it.
+const ADMIN_EMAILS = [
+  'giuseppe.concialdi@gmail.com',
+  'noemi.gozzi@gmail.com',
+  'enrico.fontana1997@gmail.com',
+  'michela@tarantino.email',
+  'nicole.bizzini@gmail.com',
+];
+
+// Admin access from the Authorization header. Either session type counts: an
+// admin magic-link session, or a member session whose email is on the allowlist
+// — admins are members too, so one sign-in covers both panels.
+async function resolveAdmin(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!token) return false;
-  const session = await AdminSession.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date() } });
-  return !!session;
+  if (!token) return null;
+  const tokenHash = sha256(token);
+  const now = new Date();
+
+  const adminSession = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: now } });
+  if (adminSession) return { email: adminSession.email, via: 'admin' };
+
+  const memberSession = await MemberSession.findOne({ tokenHash, expiresAt: { $gt: now } });
+  if (memberSession && ADMIN_EMAILS.includes(memberSession.email)) {
+    return { email: memberSession.email, via: 'member' };
+  }
+  return null;
+}
+
+async function isAuthorized(req) {
+  return !!(await resolveAdmin(req));
 }
 
 // Resolve the member session from the Authorization header. Only approved
 // profiles count as "inside" — a pending applicant's session (if any) doesn't
-// unlock the directory.
+// unlock the directory. An admin session counts too: it resolves to that
+// admin's own approved profile, so signing in to /admin also unlocks the
+// directory.
 async function findMemberSession(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
   const session = await MemberSession.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date() } });
-  if (!session) return null;
-  const profile = await CommunityProfile.findById(session.profileId);
-  if (!profile || profile.status !== 'approved') return null;
-  return { session, profile };
+  if (session) {
+    const profile = await CommunityProfile.findById(session.profileId);
+    if (!profile || profile.status !== 'approved') return null;
+    return { session, profile };
+  }
+
+  const admin = await resolveAdmin(req);
+  if (!admin) return null;
+  const profile = await CommunityProfile.findOne({ email: admin.email, status: 'approved' });
+  return profile ? { session: null, profile } : null;
 }
 
 // Approved members get a sequential member number and an invite code, assigned

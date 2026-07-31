@@ -1,25 +1,8 @@
 import express from 'express';
-import crypto from 'crypto';
 import SponsorInquiry from '../models/SponsorInquiry.js';
-import { AdminSession } from '../models/AdminAuth.js';
+import { requireAdmin } from '../utils/adminAccess.js';
 
 const router = express.Router();
-
-async function requireAdmin(req, res, next) {
-  try {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-    if (token) {
-      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      const session = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
-      if (session) return next();
-    }
-    return res.status(401).json({ success: false, message: 'Unauthorized' });
-  } catch (error) {
-    console.error('Auth check failed:', error);
-    return res.status(500).json({ success: false, message: 'Something went wrong' });
-  }
-}
 
 const SPONSOR_TO_EMAIL = process.env.SPONSOR_TO_EMAIL || 'ciao@italiantechclubnyc.com';
 const SPONSOR_FROM_EMAIL = process.env.SPONSOR_FROM_EMAIL || 'ITC Website <onboarding@resend.dev>';

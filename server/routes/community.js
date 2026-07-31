@@ -2,8 +2,8 @@ import express from 'express';
 import crypto from 'crypto';
 import CommunityProfile from '../models/CommunityProfile.js';
 import EmailClaimRequest from '../models/EmailClaimRequest.js';
-import { AdminSession } from '../models/AdminAuth.js';
 import { MemberSession } from '../models/MemberAuth.js';
+import { resolveAdmin, requireAdmin } from '../utils/adminAccess.js';
 import { ConnectRequest } from '../models/ConnectRequest.js';
 import { ProfileView } from '../models/ProfileView.js';
 import { nextSequence } from '../models/Counter.js';
@@ -53,16 +53,24 @@ async function findProfileByToken(token) {
 
 // Resolve the member session from the Authorization header. Only approved
 // profiles count as "inside" — a pending applicant's session (if any) doesn't
-// unlock the directory.
+// unlock the directory. An admin session counts too: it resolves to that
+// admin's own approved profile, so signing in to /admin also unlocks the
+// directory (and vice versa — see resolveAdmin).
 async function findMemberSession(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
   const session = await MemberSession.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date() } });
-  if (!session) return null;
-  const profile = await CommunityProfile.findById(session.profileId);
-  if (!profile || profile.status !== 'approved') return null;
-  return { session, profile };
+  if (session) {
+    const profile = await CommunityProfile.findById(session.profileId);
+    if (!profile || profile.status !== 'approved') return null;
+    return { session, profile };
+  }
+
+  const admin = await resolveAdmin(req);
+  if (!admin) return null;
+  const profile = await CommunityProfile.findOne({ email: admin.email, status: 'approved' });
+  return profile ? { session: null, profile } : null;
 }
 
 // "Giuseppe D'Anno" -> "giuseppe-danno". Strips accents so Italian names keep
@@ -159,26 +167,6 @@ const memberSummary = (profile) => ({
   isFounder: profile.isFounder,
   memberNumber: profile.memberNumber,
 });
-
-async function isAuthorized(req) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!token) return false;
-  const session = await AdminSession.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date() } });
-  return !!session;
-}
-
-async function requireAdmin(req, res, next) {
-  try {
-    if (!(await isAuthorized(req))) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-    next();
-  } catch (error) {
-    console.error('Auth check failed:', error);
-    return res.status(500).json({ success: false, message: 'Something went wrong' });
-  }
-}
 
 // Applies the effects of accessing a profile via a valid magic link: verifies
 // the email, marks it claimed, and (for a seeded-but-unconsented profile)

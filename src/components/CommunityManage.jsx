@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import ImageCropper from './ImageCropper';
 import ThemeToggle from './ThemeToggle';
-import { setMemberSession, clearMemberSession, getMemberSession, memberAuthHeaders } from '../lib/memberSession';
+import { setMemberSession, clearMemberSession, getCommunitySession, memberAuthHeaders } from '../lib/memberSession';
 import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS } from '../lib/communityOptions';
 import { cardImageKey } from '../lib/cardArt';
 import { Credential, CardActions } from './MemberCard';
@@ -915,7 +915,7 @@ const CommunityManage = () => {
           ? <ConfirmEmailChange emailToken={emailToken} />
           : token
             ? <EditProfile token={token} />
-            : getMemberSession()
+            : getCommunitySession()
               ? <EditProfile token={null} />
               : <ManageEntry />}
       </div>

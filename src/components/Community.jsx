@@ -22,7 +22,8 @@ import {
   Flame,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
-import { getMemberSession, memberAuthHeaders, clearMemberSession } from '../lib/memberSession';
+import { getCommunitySession, memberAuthHeaders, clearMemberSession } from '../lib/memberSession';
+import { clearAdminSession } from '../lib/adminSession';
 import { ROLE_OPTIONS, LOOKING_FOR_OPTIONS, roleLabel, lookingForLabel, lookingForPhrase } from '../lib/communityOptions';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -520,7 +521,7 @@ const Community = () => {
     const fetchProfiles = async () => {
       setLoading(true);
       try {
-        const hadSession = !!getMemberSession();
+        const hadSession = !!getCommunitySession();
         const response = await fetch(`${API_URL}/api/community/profiles`, {
           headers: memberAuthHeaders(),
         });
@@ -558,6 +559,9 @@ const Community = () => {
       // best effort — local sign-out below is what matters
     }
     clearMemberSession();
+    // Admins get in here with their admin session, so a sign-out that left it
+    // in place wouldn't lock the directory again.
+    clearAdminSession();
     setSelected(null);
     setRefresh((n) => n + 1);
   };

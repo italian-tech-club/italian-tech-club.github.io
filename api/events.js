@@ -85,7 +85,30 @@ const adminSessionSchema = new mongoose.Schema({
 });
 adminSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+// Member sessions issued by the community magic link — an admin who signed in
+// there is an admin here too, so one sign-in covers both panels.
+const memberSessionSchema = new mongoose.Schema({
+  tokenHash: { type: String, required: true, unique: true },
+  profileId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  email: { type: String, required: true, lowercase: true },
+  expiresAt: { type: Date, required: true },
+}, {
+  timestamps: true,
+  collection: 'member_sessions',
+});
+
 const AdminSession = mongoose.models.AdminSession || mongoose.model('AdminSession', adminSessionSchema);
+const MemberSession = mongoose.models.MemberSession || mongoose.model('MemberSession', memberSessionSchema);
+
+// Mirrors the allowlist in /api/admin/auth — a member session only carries
+// admin rights if its email is on it.
+const ADMIN_EMAILS = [
+  'giuseppe.concialdi@gmail.com',
+  'noemi.gozzi@gmail.com',
+  'enrico.fontana1997@gmail.com',
+  'michela@tarantino.email',
+  'nicole.bizzini@gmail.com',
+];
 
 async function isAuthorized(req) {
   const header = req.headers.authorization || '';
@@ -93,8 +116,12 @@ async function isAuthorized(req) {
   if (!token) return false;
 
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const session = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
-  return !!session;
+  const now = new Date();
+  const adminSession = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: now } });
+  if (adminSession) return true;
+
+  const memberSession = await MemberSession.findOne({ tokenHash, expiresAt: { $gt: now } });
+  return !!memberSession && ADMIN_EMAILS.includes(memberSession.email);
 }
 
 function pickEventFields(body) {

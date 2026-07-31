@@ -1,33 +1,10 @@
 import express from 'express';
-import crypto from 'crypto';
 import Event from '../models/Event.js';
-import { AdminSession } from '../models/AdminAuth.js';
+import { requireAdmin } from '../utils/adminAccess.js';
 
 const router = express.Router();
 
 const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery', 'recurrence', 'series'];
-
-async function isAuthorized(req) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!token) return false;
-
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const session = await AdminSession.findOne({ tokenHash, expiresAt: { $gt: new Date() } });
-  return !!session;
-}
-
-async function requireAdmin(req, res, next) {
-  try {
-    if (!(await isAuthorized(req))) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-    next();
-  } catch (error) {
-    console.error('Auth check failed:', error);
-    return res.status(500).json({ success: false, message: 'Something went wrong' });
-  }
-}
 
 function pickEventFields(body) {
   const data = {};

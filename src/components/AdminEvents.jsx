@@ -8,9 +8,17 @@ import { fileToResizedDataUrl } from '../utils/image';
 import { describeCadence, expandOccurrences, formatShortDate, isRecurring, nextOccurrence } from '../lib/eventSchedule';
 import AdminInquiries from './AdminInquiries';
 import AdminCommunity from './AdminCommunity';
+import { getAdminSession, setAdminSession, clearAdminSession } from '../lib/adminSession';
+import { getMemberSession, clearMemberSession } from '../lib/memberSession';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
-const STORAGE_KEY = 'itc_admin_session';
+
+// Best-effort server-side revoke — the local session is cleared either way.
+const postSignOut = (token) => fetch(`${API_URL}/api/admin/auth`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ action: 'signout' }),
+}).catch(() => {});
 
 const EVENT_TYPES = ['Networking', 'Talk', 'Launch Party', "Members' Dinner", "Members' Brunch", "Members' Aperitivo"];
 
@@ -778,8 +786,14 @@ const EventForm = ({ initialForm, saving, error, onSubmit, onCancel, isEdit, ser
 };
 
 const AdminEvents = () => {
-  const [adminKey, setAdminKey] = useState(() => sessionStorage.getItem(STORAGE_KEY) || '');
-  const [exchanging, setExchanging] = useState(() => new URLSearchParams(window.location.search).has('token'));
+  const [adminKey, setAdminKey] = useState(() => getAdminSession()?.token || '');
+  // Holds the login gate back while we sign in from something we already have: a
+  // magic-link token in the URL, or the community session (which counts as admin
+  // when its email is on the allowlist). A cached admin session renders the panel
+  // straight away and is revalidated in the background.
+  const [exchanging, setExchanging] = useState(() =>
+    new URLSearchParams(window.location.search).has('token') || (!getAdminSession() && !!getMemberSession())
+  );
   const [loginError, setLoginError] = useState('');
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -833,41 +847,77 @@ const AdminEvents = () => {
     if (adminKey) fetchEvents();
   }, [adminKey, fetchEvents]);
 
-  // Exchange the emailed magic-link token for a session token
+  // Sign in without typing an email whenever possible: exchange a magic-link
+  // token if the URL carries one, otherwise ask the API whether a token this
+  // browser already holds (cached admin session, or the community session) is
+  // good for the panel.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    if (!token) return;
+    const linkToken = params.get('token');
 
     // Strip the token from the URL immediately (browser history hygiene)
-    window.history.replaceState({}, '', window.location.pathname);
+    if (linkToken) window.history.replaceState({}, '', window.location.pathname);
 
-    const exchange = async () => {
+    const postAuth = (body, token) => fetch(`${API_URL}/api/admin/auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+
+    const signIn = async () => {
+      if (linkToken) {
+        try {
+          const response = await postAuth({ action: 'exchange', token: linkToken });
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            setAdminSession({ token: data.sessionToken, expiresAt: data.sessionExpiresAt, email: data.email });
+            setAdminKey(data.sessionToken);
+          } else {
+            setLoginError(data.message || 'This login link is invalid or has expired.');
+          }
+        } catch {
+          setLoginError('Could not reach the server. Please try again.');
+        }
+        return;
+      }
+
+      const cached = getAdminSession();
+      const candidate = cached?.token || getMemberSession()?.token;
+      if (!candidate) return;
+
       try {
-        const response = await fetch(`${API_URL}/api/admin/auth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'exchange', token }),
-        });
+        const response = await postAuth({ action: 'session' }, candidate);
         const data = await response.json();
-
         if (response.ok && data.success) {
-          sessionStorage.setItem(STORAGE_KEY, data.sessionToken);
-          setAdminKey(data.sessionToken);
-        } else {
-          setLoginError(data.message || 'This login link is invalid or has expired.');
+          setAdminSession({ token: candidate, expiresAt: data.sessionExpiresAt, email: data.email, via: data.via });
+          setAdminKey(candidate);
+        } else if (cached) {
+          // Revoked or expired server-side — drop the stale token.
+          clearAdminSession();
+          setAdminKey('');
         }
       } catch {
-        setLoginError('Could not reach the server. Please try again.');
-      } finally {
-        setExchanging(false);
+        // Server unreachable: keep whatever we had and let the first
+        // authenticated call surface the problem.
       }
     };
-    exchange();
+
+    signIn().finally(() => setExchanging(false));
   }, []);
 
   const handleLogout = useCallback(() => {
-    sessionStorage.removeItem(STORAGE_KEY);
+    const session = getAdminSession();
+    if (session) {
+      postSignOut(session.token);
+    }
+    clearAdminSession();
+    // The community session doubles as an admin credential, so signing out has
+    // to drop it too — otherwise the next load signs straight back in.
+    clearMemberSession();
     setAdminKey('');
     setEvents([]);
   }, []);

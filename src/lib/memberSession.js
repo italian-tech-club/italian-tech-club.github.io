@@ -1,3 +1,5 @@
+import { getAdminSession } from './adminSession';
+
 // Member session persistence. The token is issued by the manage magic-link
 // flow (GET /api/community/manage?token=) and unlocks the full directory +
 // member-only actions for 30 days.
@@ -34,7 +36,13 @@ export function clearMemberSession() {
   }
 }
 
+// Whatever token unlocks the community for this browser: the member session, or
+// an admin session (the API resolves it to that admin's own profile).
+export function getCommunitySession() {
+  return getMemberSession() || getAdminSession();
+}
+
 export function memberAuthHeaders() {
-  const session = getMemberSession();
+  const session = getCommunitySession();
   return session ? { Authorization: `Bearer ${session.token}` } : {};
 }

@@ -1,21 +1,12 @@
 import express from 'express';
 import crypto from 'crypto';
 import { AdminLoginToken, AdminSession } from '../models/AdminAuth.js';
+import { ADMIN_SESSION_TTL_MS, ADMIN_EMAILS, bearerToken, resolveAdmin } from '../utils/adminAccess.js';
 import { sendEmail, magicLinkHtml, SITE_URL } from '../utils/email.js';
 
 const router = express.Router();
 
-// Hardcoded admin allowlist — the only emails that can receive a login link
-const ADMIN_EMAILS = [
-  'giuseppe.concialdi@gmail.com',
-  'noemi.gozzi@gmail.com',
-  'enrico.fontana1997@gmail.com',
-  'michela@tarantino.email',
-  'nicole.bizzini@gmail.com',
-];
-
 const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes, single-use
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -23,10 +14,30 @@ const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex'
  * POST /api/admin/auth
  * { action: 'request', email }  — email a magic login link (allowlisted emails only)
  * { action: 'exchange', token } — exchange a one-time link token for a session token
+ * { action: 'session' }         — validate the Bearer token in the header (an admin
+ *                                 session, or a member session on the allowlist)
+ * { action: 'signout' }         — revoke the admin session in the header
  */
 router.post('/', async (req, res) => {
   try {
     const { action } = req.body || {};
+
+    if (action === 'signout') {
+      const token = bearerToken(req);
+      if (token) await AdminSession.deleteOne({ tokenHash: sha256(token) });
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'session') {
+      const admin = await resolveAdmin(req);
+      if (!admin) return res.status(401).json({ success: false, message: 'Not signed in' });
+      return res.status(200).json({
+        success: true,
+        email: admin.email,
+        via: admin.via,
+        sessionExpiresAt: admin.expiresAt,
+      });
+    }
 
     if (action === 'request') {
       const email = (req.body.email || '').toLowerCase().trim();
@@ -79,13 +90,14 @@ router.post('/', async (req, res) => {
       await loginToken.save();
 
       const sessionToken = crypto.randomBytes(32).toString('hex');
+      const sessionExpiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_MS);
       await AdminSession.create({
         tokenHash: sha256(sessionToken),
         email: loginToken.email,
-        expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+        expiresAt: sessionExpiresAt,
       });
 
-      return res.status(200).json({ success: true, sessionToken, email: loginToken.email });
+      return res.status(200).json({ success: true, sessionToken, email: loginToken.email, sessionExpiresAt });
     }
 
     return res.status(400).json({ success: false, message: 'Unknown action' });
