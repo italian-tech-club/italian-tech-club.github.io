@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Linkedin, ArrowRight, ExternalLink } from 'lucide-react';
+import { Mail, Linkedin, Instagram, ArrowRight, ExternalLink } from 'lucide-react';
 import { fadeRise, VIEWPORT } from '../lib/motion';
 
 const Contact = () => {
@@ -35,8 +35,11 @@ const Contact = () => {
               </a>
 
               <div className="flex gap-4">
-                <a href="https://www.linkedin.com/company/italian-tech-club" className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-itc-green transition-all group">
+                <a href="https://www.linkedin.com/company/italian-tech-club" target="_blank" rel="noopener noreferrer" aria-label="Italian Tech Club NYC on LinkedIn" className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-itc-green transition-all group">
                   <Linkedin className="w-5 h-5 text-slate-400 group-hover:text-white" />
+                </a>
+                <a href="https://www.instagram.com/italiantechclub.nyc" target="_blank" rel="noopener noreferrer" aria-label="Italian Tech Club NYC on Instagram" className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-itc-green transition-all group">
+                  <Instagram className="w-5 h-5 text-slate-400 group-hover:text-white" />
                 </a>
               </div>
             </div>
