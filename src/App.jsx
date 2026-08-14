@@ -26,6 +26,11 @@ import CommunityConnect from './components/CommunityConnect';
 import MemberCard from './components/MemberCard';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TermsOfService from './components/TermsOfService';
+import PartnersTeaser from './components/PartnersTeaser';
+import Partners from './components/Partners';
+import PartnerDetail from './components/PartnerDetail';
+import CommunityPerks from './components/CommunityPerks';
+import BenefitVerify from './components/BenefitVerify';
 
 // Homepage component with all sections.
 const HomePage = () => {
@@ -50,8 +55,9 @@ const HomePage = () => {
         <About />
         <Activities />
         <Events />
-        <Team />
         <CommunityTeaser />
+        <Team />
+        <PartnersTeaser />
         <Sponsor />
         <Contact />
       </main>
@@ -81,7 +87,11 @@ function App() {
       <Route path="/community/join" element={<CommunityJoin />} />
       <Route path="/community/manage" element={<CommunityManage />} />
       <Route path="/community/connect" element={<CommunityConnect />} />
+      <Route path="/community/perks" element={<CommunityPerks />} />
       <Route path="/m/:slug" element={<MemberCard />} />
+      <Route path="/partners" element={<Partners />} />
+      <Route path="/partners/:slug" element={<PartnerDetail />} />
+      <Route path="/verify" element={<BenefitVerify />} />
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />

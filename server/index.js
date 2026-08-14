@@ -7,6 +7,7 @@ import communityRoutes from './routes/community.js';
 import sponsorRoutes from './routes/sponsor.js';
 import eventsRoutes from './routes/events.js';
 import adminAuthRoutes from './routes/adminAuth.js';
+import partnersRoutes from './routes/partners.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +25,7 @@ app.use('/api/community', communityRoutes);
 app.use('/api/sponsor', sponsorRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/partners', partnersRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

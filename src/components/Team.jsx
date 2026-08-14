@@ -22,9 +22,9 @@ const TeamCard = ({ name, linkedin }) => {
             rel="noopener noreferrer"
             variants={fadeRise}
             whileHover={{ y: -4, transition: hoverSpring }}
-            className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-itc-green/50 dark:hover:border-itc-green/50 hover:shadow-lg transition-[border-color,box-shadow] duration-300 ease-out-quint flex items-center gap-4 w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]"
+            className="group bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-itc-green/50 dark:hover:border-itc-green/50 hover:shadow-lg transition-[border-color,box-shadow] duration-300 ease-out-quint flex items-center gap-4 w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]"
         >
-            <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-900 dark:text-white font-bold text-lg group-hover:bg-itc-green group-hover:border-itc-green group-hover:text-white transition-colors duration-300 ease-out-quint">
+            <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-900 dark:text-white font-bold text-lg group-hover:bg-itc-green group-hover:border-itc-green group-hover:text-white transition-colors duration-300 ease-out-quint">
                 {initials}
             </div>
             <div className="flex-grow">
@@ -41,7 +41,7 @@ const TeamCard = ({ name, linkedin }) => {
 
 const Team = () => {
   return (
-    <section id="team" className="py-24 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+    <section id="team" className="py-24 bg-white dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={fadeRise}

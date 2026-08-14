@@ -6,11 +6,11 @@ import { useTheme } from '../context/ThemeContext';
 import { MEMBER_FORM_URL } from '../config';
 import { EASE } from '../lib/motion';
 
-const BASE_NAV_ITEMS = ['Who we are', 'What we do', 'Events', 'Team'];
+// Same order as the homepage sections — each item scrolls to its section id.
+const NAV_ITEMS = ['Who we are', 'What we do', 'Events', 'Community', 'Team', 'Partners', 'Sponsor'];
 
 const Navbar = () => {
   const { theme } = useTheme();
-  const NAV_ITEMS = [...BASE_NAV_ITEMS, 'Community', 'Sponsor'];
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -43,7 +43,7 @@ const Navbar = () => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
-          <div className="flex-shrink-0 flex items-center cursor-pointer gap-6" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+          <div className="flex-shrink-0 flex items-center cursor-pointer gap-4 lg:gap-6" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
             <div className="h-20 flex items-center justify-center overflow-visible">
                 <img
                   src={theme === 'dark' ? "/logo-white.png" : "/logo.png"}
@@ -56,17 +56,21 @@ const Navbar = () => {
                   className="h-[50%] w-auto object-contain max-w-none transition-opacity duration-300"
                 />
             </div>
-            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white hidden sm:block border-l border-slate-300 dark:border-slate-700 pl-6 py-1">NYC Chapter</span>
+            {/* Hidden at lg, where the seven nav links need every pixel; back at
+                xl and on the hamburger widths below lg. */}
+            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white hidden sm:block lg:hidden xl:block whitespace-nowrap border-l border-slate-300 dark:border-slate-700 pl-4 xl:pl-6 py-1">NYC Chapter</span>
           </div>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center space-x-8">
+          {/* Seven links plus the CTA don't fit a tablet width — the hamburger
+              carries them until lg. */}
+          <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
             {NAV_ITEMS.map((item) => (
               <a
                 key={item}
                 href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
                 onClick={(e) => scrollToSection(e, item.toLowerCase().replace(/\s+/g, '-'))}
-                className="relative text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-300 group py-1"
+                className="relative whitespace-nowrap text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-300 group py-1"
               >
                 {item}
                 <span className="absolute left-0 -bottom-0.5 h-px w-full origin-left scale-x-0 group-hover:scale-x-100 bg-itc-green transition-transform duration-300 ease-out-quint" />
@@ -77,14 +81,14 @@ const Navbar = () => {
               href={MEMBER_FORM_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium hover:bg-itc-red dark:hover:bg-itc-red dark:hover:text-white transition-all duration-300 ease-out-quint hover:shadow-lg hover:shadow-itc-red/20 hover:-translate-y-0.5"
+              className="px-4 xl:px-6 py-2.5 rounded-full whitespace-nowrap bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium hover:bg-itc-red dark:hover:bg-itc-red dark:hover:text-white transition-all duration-300 ease-out-quint hover:shadow-lg hover:shadow-itc-red/20 hover:-translate-y-0.5"
             >
               Become a Member
             </a>
           </div>
 
           {/* Mobile controls */}
-          <div className="md:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2">
             <ThemeToggle />
             <button
               onClick={() => setMenuOpen((open) => !open)}
@@ -106,7 +110,7 @@ const Navbar = () => {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.35, ease: EASE }}
-            className="md:hidden overflow-hidden bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800"
+            className="lg:hidden overflow-hidden bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800"
           >
             <div className="px-4 py-4 flex flex-col gap-1">
               {NAV_ITEMS.map((item) => (
