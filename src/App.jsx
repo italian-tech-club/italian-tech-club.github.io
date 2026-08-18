@@ -31,6 +31,8 @@ import Partners from './components/Partners';
 import PartnerDetail from './components/PartnerDetail';
 import CommunityPerks from './components/CommunityPerks';
 import BenefitVerify from './components/BenefitVerify';
+import Ecosystem from './components/Ecosystem';
+import EcosystemAbout from './components/EcosystemAbout';
 
 // Homepage component with all sections.
 const HomePage = () => {
@@ -92,6 +94,9 @@ function App() {
       <Route path="/partners" element={<Partners />} />
       <Route path="/partners/:slug" element={<PartnerDetail />} />
       <Route path="/verify" element={<BenefitVerify />} />
+      {/* Unlisted on purpose: reachable by URL, absent from nav and homepage. */}
+      <Route path="/ecosystem" element={<Ecosystem />} />
+      <Route path="/ecosystem/about" element={<EcosystemAbout />} />
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
