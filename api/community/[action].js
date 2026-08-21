@@ -13,6 +13,7 @@ import crypto from 'crypto';
  *   GET    /api/community/card              (public: shareable member card)
  *   POST   /api/community/claim-request
  *   GET|POST /api/community/admin           (admin session required)
+ *   POST   /api/community/gomry-webhook     (Gomry deliveries; shared secret in ?secret=)
  * The segment after /community/ arrives as req.query.action.
  * (Mirror of server/routes/community.js used by the local express server.)
  */
@@ -149,6 +150,21 @@ const counterSchema = new mongoose.Schema({
   collection: 'counters',
 });
 
+const gomryWebhookEventSchema = new mongoose.Schema({
+  channel: { type: String, enum: ['application', 'contact', 'unknown'], default: 'unknown', index: true },
+  payload: { type: mongoose.Schema.Types.Mixed, required: true },
+  headers: { type: mongoose.Schema.Types.Mixed, default: {} },
+  applicationId: { type: String, default: null, index: true },
+  contactId: { type: String, default: null, index: true },
+  status: { type: String, default: null },
+  processedAt: { type: Date, default: null },
+  processError: { type: String, default: null },
+}, {
+  timestamps: true,
+  collection: 'gomry_webhook_events',
+});
+gomryWebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+
 const CommunityProfile = mongoose.models.CommunityProfile || mongoose.model('CommunityProfile', communityProfileSchema);
 const EmailClaimRequest = mongoose.models.EmailClaimRequest || mongoose.model('EmailClaimRequest', emailClaimRequestSchema);
 const AdminSession = mongoose.models.AdminSession || mongoose.model('AdminSession', adminSessionSchema);
@@ -156,6 +172,7 @@ const MemberSession = mongoose.models.MemberSession || mongoose.model('MemberSes
 const ConnectRequest = mongoose.models.ConnectRequest || mongoose.model('ConnectRequest', connectRequestSchema);
 const ProfileView = mongoose.models.ProfileView || mongoose.model('ProfileView', profileViewSchema);
 const Counter = mongoose.models.Counter || mongoose.model('Counter', counterSchema);
+const GomryWebhookEvent = mongoose.models.GomryWebhookEvent || mongoose.model('GomryWebhookEvent', gomryWebhookEventSchema);
 
 const MANAGE_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
 const EMAIL_CHANGE_TTL_MS = 60 * 60 * 1000; // 60 minutes
@@ -1275,6 +1292,73 @@ async function handleAdmin(req, res) {
   return res.status(405).json({ success: false, message: 'Method not allowed' });
 }
 
+const GOMRY_WEBHOOK_CHANNELS = new Set(['application', 'contact']);
+
+/**
+ * Receiver for Gomry's two webhook channels (Impostazioni Organizzazione →
+ * Integrazioni): new/updated form applications, and contact updates.
+ *
+ * Gomry sends no signature and publishes no payload schema, so the registered
+ * URL carries a shared secret and names its own channel:
+ *   POST /api/community/gomry-webhook?secret=<GOMRY_WEBHOOK_SECRET>&channel=application
+ *
+ * The body is stored verbatim rather than mapped inline — a delivery we failed
+ * to understand is worth more on disk than dropped, and the mapping can then be
+ * written against real payloads and replayed. Answers 200 for anything that
+ * authenticates, so an unfamiliar shape doesn't trigger endless redelivery.
+ */
+async function handleGomryWebhook(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
+  }
+
+  const expected = process.env.GOMRY_WEBHOOK_SECRET;
+  if (!expected) {
+    console.error('GomryWebhook: GOMRY_WEBHOOK_SECRET is not set — refusing delivery');
+    return res.status(503).json({ success: false, message: 'Not configured' });
+  }
+
+  // Length is compared first because timingSafeEqual throws on a mismatch.
+  const provided = Buffer.from(typeof req.query.secret === 'string' ? req.query.secret : '');
+  const secret = Buffer.from(expected);
+  if (provided.length !== secret.length || !crypto.timingSafeEqual(provided, secret)) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const channel = GOMRY_WEBHOOK_CHANNELS.has(req.query.channel) ? req.query.channel : 'unknown';
+  const payload = (req.body && typeof req.body === 'object') ? req.body : { raw: req.body ?? null };
+
+  // Kept for a signing header Gomry may start sending; drop the credential-bearing ones.
+  const headers = { ...req.headers };
+  delete headers.cookie;
+  delete headers.authorization;
+
+  // Shape is unknown, so look through the wrappers Gomry plausibly uses.
+  const root = payload.data || payload.application || payload.contact || payload;
+  const pick = (...keys) => {
+    for (const key of keys) {
+      const value = root?.[key] ?? payload?.[key];
+      if (typeof value === 'string' && value) return value;
+    }
+    return null;
+  };
+  const isContact = channel === 'contact';
+
+  const event = await GomryWebhookEvent.create({
+    channel,
+    payload,
+    headers,
+    applicationId: isContact ? pick('application_id', 'applicationId') : pick('application_id', 'applicationId', 'id'),
+    contactId: isContact ? pick('contact_id', 'contactId', 'id') : pick('contact_id', 'contactId'),
+    status: pick('status'),
+  });
+
+  // Logged so the first deliveries are visible in Vercel logs without a DB round-trip.
+  console.log(`GomryWebhook: stored ${channel} delivery ${event._id} (keys: ${Object.keys(payload).join(', ') || 'none'})`);
+
+  return res.status(200).json({ success: true });
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -1301,6 +1385,7 @@ export default async function handler(req, res) {
       case 'card': return await handleCard(req, res);
       case 'claim-request': return await handleClaimRequest(req, res);
       case 'admin': return await handleAdmin(req, res);
+      case 'gomry-webhook': return await handleGomryWebhook(req, res);
       default: return res.status(404).json({ success: false, message: 'Not found' });
     }
   } catch (error) {

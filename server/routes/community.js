@@ -7,6 +7,7 @@ import { resolveAdmin, requireAdmin } from '../utils/adminAccess.js';
 import { ConnectRequest } from '../models/ConnectRequest.js';
 import { ProfileView } from '../models/ProfileView.js';
 import { nextSequence } from '../models/Counter.js';
+import GomryWebhookEvent from '../models/GomryWebhookEvent.js';
 import { sendEmail, sendEmailBatch, magicLinkHtml, campaignHtml, fillTemplate, SITE_URL } from '../utils/email.js';
 
 const router = express.Router();
@@ -893,6 +894,73 @@ router.post('/claim-request', async (req, res) => {
       return res.status(400).json({ success: false, message: messages.join(', ') });
     }
     return res.status(500).json({ success: false, message: 'Something went wrong. Please try again.' });
+  }
+});
+
+const GOMRY_WEBHOOK_CHANNELS = new Set(['application', 'contact']);
+
+/**
+ * POST /api/community/gomry-webhook — receiver for Gomry's webhook channels
+ * (Impostazioni Organizzazione -> Integrazioni): new/updated form applications,
+ * and contact updates.
+ *
+ * Gomry sends no signature and publishes no payload schema, so the registered
+ * URL carries a shared secret and names its own channel:
+ *   ?secret=<GOMRY_WEBHOOK_SECRET>&channel=application
+ *
+ * The body is stored verbatim rather than mapped inline - a delivery we failed
+ * to understand is worth more on disk than dropped, and the mapping can then be
+ * written against real payloads and replayed. Answers 200 for anything that
+ * authenticates, so an unfamiliar shape doesn't trigger endless redelivery.
+ */
+router.post('/gomry-webhook', async (req, res) => {
+  try {
+    const expected = process.env.GOMRY_WEBHOOK_SECRET;
+    if (!expected) {
+      console.error('GomryWebhook: GOMRY_WEBHOOK_SECRET is not set - refusing delivery');
+      return res.status(503).json({ success: false, message: 'Not configured' });
+    }
+
+    // Length is compared first because timingSafeEqual throws on a mismatch.
+    const provided = Buffer.from(typeof req.query.secret === 'string' ? req.query.secret : '');
+    const secret = Buffer.from(expected);
+    if (provided.length !== secret.length || !crypto.timingSafeEqual(provided, secret)) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const channel = GOMRY_WEBHOOK_CHANNELS.has(req.query.channel) ? req.query.channel : 'unknown';
+    const payload = (req.body && typeof req.body === 'object') ? req.body : { raw: req.body ?? null };
+
+    const headers = { ...req.headers };
+    delete headers.cookie;
+    delete headers.authorization;
+
+    // Shape is unknown, so look through the wrappers Gomry plausibly uses.
+    const root = payload.data || payload.application || payload.contact || payload;
+    const pick = (...keys) => {
+      for (const key of keys) {
+        const value = root?.[key] ?? payload?.[key];
+        if (typeof value === 'string' && value) return value;
+      }
+      return null;
+    };
+    const isContact = channel === 'contact';
+
+    const event = await GomryWebhookEvent.create({
+      channel,
+      payload,
+      headers,
+      applicationId: isContact ? pick('application_id', 'applicationId') : pick('application_id', 'applicationId', 'id'),
+      contactId: isContact ? pick('contact_id', 'contactId', 'id') : pick('contact_id', 'contactId'),
+      status: pick('status'),
+    });
+
+    console.log(`GomryWebhook: stored ${channel} delivery ${event._id} (keys: ${Object.keys(payload).join(', ') || 'none'})`);
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Gomry webhook error:', error);
+    return res.status(500).json({ success: false, message: 'Something went wrong.' });
   }
 });
 

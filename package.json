@@ -15,7 +15,8 @@
     "backfill:member-numbers": "node scripts/backfill-member-numbers.js",
     "backfill:pics": "node scripts/backfill-profile-pics.js",
     "collect:pics": "node scripts/collect-linkedin-pics.js",
-    "seed:posto-fisso": "node scripts/seed-posto-fisso.js"
+    "seed:posto-fisso": "node scripts/seed-posto-fisso.js",
+    "inspect:gomry": "node scripts/inspect-gomry-webhooks.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
