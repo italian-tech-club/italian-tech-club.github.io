@@ -13,6 +13,13 @@ export default {
           red: '#CE2B37',
           white: '#F1F2F1',
         },
+        // I³/NYC's brand purple — used only on /i4, where the two identities
+        // sit side by side. `purpleLit` is the dark-theme reading of the same
+        // hue, since #7000FF goes muddy on slate-950.
+        i3: {
+          purple: '#7000FF',
+          purpleLit: '#9C5CFF',
+        },
         // Member card only (/m/<slug>) — a darker, metallic register than the
         // rest of the site.
         card: {

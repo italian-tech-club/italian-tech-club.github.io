@@ -33,6 +33,7 @@ import CommunityPerks from './components/CommunityPerks';
 import BenefitVerify from './components/BenefitVerify';
 import Ecosystem from './components/Ecosystem';
 import EcosystemAbout from './components/EcosystemAbout';
+import I4Page from './components/I4Page';
 
 // Homepage component with all sections.
 const HomePage = () => {
@@ -97,6 +98,7 @@ function App() {
       {/* Unlisted on purpose: reachable by URL, absent from nav and homepage. */}
       <Route path="/ecosystem" element={<Ecosystem />} />
       <Route path="/ecosystem/about" element={<EcosystemAbout />} />
+      <Route path="/i4" element={<I4Page />} />
       <Route path="/sponsor" element={<SponsorPage />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
