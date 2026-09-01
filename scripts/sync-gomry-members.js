@@ -24,12 +24,14 @@
  *   npm run sync:gomry -- --since 2026-08-01T00:00:00Z
  *   npm run sync:gomry -- --skip-list    # profiles only
  *   npm run sync:gomry -- --enrich       # also fill fields left empty on unclaimed profiles
+ *   npm run sync:gomry -- --notify       # email members created before the webhook existed
  *
  * Profile photos are not this script's job — run `npm run backfill:pics`.
  */
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import CommunityProfile from '../server/models/CommunityProfile.js';
+import { sendMemberWelcome } from '../server/utils/memberWelcome.js';
 import {
   listAcceptedApplications,
   isNycApplication,
@@ -123,6 +125,47 @@ async function enrichProfile(application) {
   return { email: doc.email, fields: Object.keys(updates) };
 }
 
+/**
+ * Send the "you're in" email to Gomry-created members who never got one.
+ *
+ * The webhook now mails each new member as it creates them, so this only exists
+ * for the ones created before that wiring landed. It sends to profiles that have
+ * NEVER been emailed — `sendMemberWelcome` enforces that too — so re-running it
+ * cannot mail anyone twice.
+ *
+ * Real mail to real people: `--dry` lists recipients without sending.
+ */
+async function notifyUnnotified({ dry }) {
+  const pending = await CommunityProfile.find({
+    gomryApplicationId: { $ne: null },
+    claimed: false,
+    status: 'approved',
+    claimEmailCount: 0,
+    lastClaimEmailAt: null,
+  }).select('firstName lastName email claimEmailCount lastClaimEmailAt').lean();
+
+  if (!pending.length) {
+    console.log('\nNo members are awaiting a welcome email.');
+    return { sent: 0, failed: 0, pending: 0 };
+  }
+
+  console.log(`\n${pending.length} member(s) never notified:`);
+  for (const p of pending) console.log(`  · ${p.firstName} ${p.lastName} <${p.email}>`);
+
+  if (dry) {
+    console.log('\n🔎 DRY RUN — no email sent.');
+    return { sent: 0, failed: 0, pending: pending.length };
+  }
+
+  let sent = 0, failed = 0;
+  for (const profile of pending) {
+    const outcome = await sendMemberWelcome({ profile, model: CommunityProfile });
+    if (outcome === 'sent') { sent += 1; console.log(`  ✉ ${profile.email}`); }
+    else if (outcome === 'failed') { failed += 1; console.log(`  ✗ ${profile.email} — send failed`); }
+  }
+  return { sent, failed, pending: pending.length };
+}
+
 async function main() {
   const dry = flag('dry');
 
@@ -150,6 +193,11 @@ async function main() {
       console.log(`  ${doc.firstName} ${doc.lastName} <${doc.email}> [${doc.status}] ${doc.profession}${note}`);
     }
     console.log(`\n🔎 DRY RUN — no writes. ${nyc.length - withoutEmail} identifiable, ${withoutEmail} without an email.`);
+    if (flag('notify')) {
+      await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
+      await notifyUnnotified({ dry: true });
+      await mongoose.disconnect();
+    }
     return;
   }
 
@@ -196,6 +244,11 @@ async function main() {
     } catch (error) {
       listError = error.message;
     }
+  }
+
+  if (flag('notify')) {
+    const { sent, failed } = await notifyUnnotified({ dry: false });
+    console.log(`\n  welcome emails sent: ${sent}${failed ? `, failed: ${failed}` : ''}`);
   }
 
   console.log('\nDone.');

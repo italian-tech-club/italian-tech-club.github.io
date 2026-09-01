@@ -9,6 +9,7 @@ import { ProfileView } from '../models/ProfileView.js';
 import { nextSequence } from '../models/Counter.js';
 import GomryWebhookEvent from '../models/GomryWebhookEvent.js';
 import { profileFromApplication, isNycApplication, getApplication, addContactsToNycList } from '../utils/gomry.js';
+import { sendMemberWelcome } from '../utils/memberWelcome.js';
 import { sendEmail, sendEmailBatch, magicLinkHtml, campaignHtml, fillTemplate, SITE_URL } from '../utils/email.js';
 
 const router = express.Router();
@@ -1002,13 +1003,26 @@ async function applyApplicationDelivery(payload, event) {
   if (!doc) return null;
 
   const { email, seeded, gomryApplicationId, gomryContactId, ...content } = doc;
-  await CommunityProfile.updateOne(
+  const result = await CommunityProfile.updateOne(
     { email },
     { $setOnInsert: content, $set: { seeded, gomryApplicationId, gomryContactId } },
     { upsert: true },
   );
 
   await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processedAt: new Date() } });
+
+  // Acceptance on Gomry is the whole approval now, so the member has no idea a
+  // profile exists until we say so. Only on a genuine insert, and the helper
+  // refuses anyone already emailed - a redelivered webhook must not mail twice.
+  if (result.upsertedCount > 0) {
+    const profile = await CommunityProfile.findOne({ email })
+      .select('firstName lastName email claimEmailCount lastClaimEmailAt')
+      .lean();
+    if (profile) {
+      const outcome = await sendMemberWelcome({ profile, model: CommunityProfile });
+      console.log(`GomryWebhook: welcome email for ${email} -> ${outcome}`);
+    }
+  }
 
   if (application.contact_id) {
     try {
