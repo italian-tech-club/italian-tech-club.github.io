@@ -234,6 +234,27 @@ export async function getContact(contactId) {
 }
 
 /**
+ * Contact records for one list, straight from MCP.
+ *
+ * MCP only, because REST's contact resource has no `img` field at all — the
+ * exact mirror of the email gap that sends everything else through REST.
+ */
+export async function listContactsWithImages(listId = NYC_LIST_ID) {
+  const contacts = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const body = await mcpCall('get_contacts', { listIds: listId, page, pageSize: 50 });
+    contacts.push(...(body.contacts || []));
+    totalPages = body.pagination?.totalPages ?? 1;
+    page += 1;
+  } while (page <= totalPages);
+
+  return contacts;
+}
+
+/**
  * Put contacts on the New York Chapter list. MCP-only (REST has no equivalent),
  * so this is the one call that can fail on a revoked token — callers should log
  * and carry on rather than abort the sync.
