@@ -152,6 +152,32 @@ export function hasGdprConsent(application) {
   return GDPR_CONSENT_VALUES.has(String(answer ?? '').trim().toLowerCase());
 }
 
+// Directory bios come from the form's own prose questions. `special` ("cosa
+// dovremmo sapere su di te che ti rende speciale?") is the one written as a
+// self-description, so it leads; `motivation` is about joining ITC and only
+// stands in when `special` is blank. Several answers are a lone space, hence the
+// length floor rather than a truthiness check.
+const MIN_BIO_LENGTH = 3;
+const MAX_BIO_LENGTH = 500;
+
+/** Bio text for one application, truncated on a word boundary. Never null. */
+export function bioFromApplication(application) {
+  const candidates = [answerOf(application, 'special'), answerOf(application, 'motivation')];
+
+  for (const candidate of candidates) {
+    const text = String(candidate ?? '').replace(/\s+/g, ' ').trim();
+    if (text.length < MIN_BIO_LENGTH) continue;
+    if (text.length <= MAX_BIO_LENGTH) return text;
+
+    // Cut at the last space before the cap so a bio never ends mid-word.
+    const clipped = text.slice(0, MAX_BIO_LENGTH - 1);
+    const lastSpace = clipped.lastIndexOf(' ');
+    return `${(lastSpace > MAX_BIO_LENGTH * 0.6 ? clipped.slice(0, lastSpace) : clipped).trimEnd()}…`;
+  }
+
+  return '';
+}
+
 /**
  * Community-profile fields for one accepted application, or null when it can't
  * identify a member. `contact` is optional and only supplies the avatar, which
@@ -181,7 +207,7 @@ export function profileFromApplication(application, contact = null) {
     profilePic: typeof avatar === 'string' && avatar.startsWith('http') ? avatar : null,
     profession: truncate(answerOf(application, 'jobTitle'), 100) || 'Member',
     company: truncate(company, 100),
-    bio: '',
+    bio: bioFromApplication(application),
     isFounder: false,
     // Without consent the profile exists but stays out of the public directory
     // until the member claims it, which records consent.

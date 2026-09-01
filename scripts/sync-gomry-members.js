@@ -23,6 +23,7 @@
  *   npm run sync:gomry                   # full reconcile
  *   npm run sync:gomry -- --since 2026-08-01T00:00:00Z
  *   npm run sync:gomry -- --skip-list    # profiles only
+ *   npm run sync:gomry -- --enrich       # also fill fields left empty on unclaimed profiles
  *
  * Profile photos are not this script's job — run `npm run backfill:pics`.
  */
@@ -84,6 +85,44 @@ export async function upsertMemberFromApplication(application, { contact = null 
   return { email, created: result.upsertedCount > 0, status: content.status };
 }
 
+// Fields the sync may fill in later on a profile that never got them. Each entry
+// says what counts as "still empty" — `profession` defaults to the placeholder
+// "Member" when an application had no job title, which is as empty as ''.
+const ENRICHABLE = {
+  bio: (current) => !current,
+  company: (current) => !current,
+  linkedIn: (current) => !current,
+  profession: (current) => !current || current === 'Member',
+};
+
+/**
+ * Fill fields that are still empty on an already-created profile.
+ *
+ * Needed because content is written with `$setOnInsert`: a profile created before
+ * a mapping existed (bios, originally) keeps the empty value forever otherwise.
+ * Only touches UNCLAIMED profiles and only writes where the current value is
+ * empty — a member's own text is never overwritten, and neither is anything a
+ * previous run already filled.
+ */
+async function enrichProfile(application) {
+  const doc = profileFromApplication(application);
+  if (!doc || ADMIN_EMAILS.has(doc.email)) return null;
+
+  const profile = await CommunityProfile.findOne({ email: doc.email, claimed: false })
+    .select(Object.keys(ENRICHABLE).join(' '))
+    .lean();
+  if (!profile) return null;
+
+  const updates = {};
+  for (const [field, isEmpty] of Object.entries(ENRICHABLE)) {
+    if (isEmpty(profile[field]) && doc[field]) updates[field] = doc[field];
+  }
+  if (!Object.keys(updates).length) return null;
+
+  await CommunityProfile.updateOne({ _id: profile._id, claimed: false }, { $set: updates });
+  return { email: doc.email, fields: Object.keys(updates) };
+}
+
 async function main() {
   const dry = flag('dry');
 
@@ -136,6 +175,17 @@ async function main() {
     }
   }
 
+  let enriched = 0;
+  if (flag('enrich')) {
+    for (const application of nyc) {
+      const result = await enrichProfile(application);
+      if (result) {
+        enriched += 1;
+        console.log(`  ~ ${result.email} ← ${result.fields.join(', ')}`);
+      }
+    }
+  }
+
   // Best-effort, and last: a revoked MCP token must not cost us the profiles above.
   let listed = 0;
   let listError = null;
@@ -152,6 +202,7 @@ async function main() {
   console.log(`  profiles created:   ${created}`);
   console.log(`  already present:    ${existing}`);
   console.log(`  skipped (admins):   ${skipped}`);
+  if (flag('enrich')) console.log(`  enriched (empty):   ${enriched}`);
   if (unidentified) console.log(`  no email on file:   ${unidentified}`);
   if (flag('skip-list')) {
     console.log('  chapter list:       skipped (--skip-list)');
