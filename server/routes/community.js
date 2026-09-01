@@ -8,6 +8,7 @@ import { ConnectRequest } from '../models/ConnectRequest.js';
 import { ProfileView } from '../models/ProfileView.js';
 import { nextSequence } from '../models/Counter.js';
 import GomryWebhookEvent from '../models/GomryWebhookEvent.js';
+import { profileFromApplication, isNycApplication, getApplication, addContactsToNycList } from '../utils/gomry.js';
 import { sendEmail, sendEmailBatch, magicLinkHtml, campaignHtml, fillTemplate, SITE_URL } from '../utils/email.js';
 
 const router = express.Router();
@@ -957,12 +958,68 @@ router.post('/gomry-webhook', async (req, res) => {
 
     console.log(`GomryWebhook: stored ${channel} delivery ${event._id} (keys: ${Object.keys(payload).join(', ') || 'none'})`);
 
+    // Best-effort: an approval should become a member immediately. Never allowed
+    // to fail the response - Gomry redelivers on non-2xx, and
+    // `npm run sync:gomry` reconciles anything this misses.
+    if (channel === 'application') {
+      try {
+        const applied = await applyApplicationDelivery(payload, event);
+        if (applied) console.log(`GomryWebhook: synced member ${applied}`);
+      } catch (error) {
+        console.error('GomryWebhook: processing failed:', error.message);
+        await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processError: error.message } });
+      }
+    }
+
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Gomry webhook error:', error);
     return res.status(500).json({ success: false, message: 'Something went wrong.' });
   }
 });
+
+/**
+ * Turn one application delivery into an NYC member, if that's what it is.
+ * Returns the email synced, or null when the delivery isn't an accepted New York
+ * approval. Prefers the delivered body and only calls Gomry when the payload
+ * lacks the answers or the applicant email.
+ */
+async function applyApplicationDelivery(payload, event) {
+  const body = payload.data || payload.application || payload;
+  const applicationId = body.id || body.application_id || null;
+
+  let application = body;
+  const usable = Array.isArray(body.answers) && body.applicant?.email;
+  if (!usable) {
+    if (!applicationId) return null;
+    application = await getApplication(applicationId);
+  }
+
+  if (String(application.status || '').toLowerCase() !== 'accepted') return null;
+  if (!isNycApplication(application)) return null;
+
+  const doc = profileFromApplication(application, body.contact || null);
+  if (!doc) return null;
+
+  const { email, seeded, gomryApplicationId, gomryContactId, ...content } = doc;
+  await CommunityProfile.updateOne(
+    { email },
+    { $setOnInsert: content, $set: { seeded, gomryApplicationId, gomryContactId } },
+    { upsert: true },
+  );
+
+  await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processedAt: new Date() } });
+
+  if (application.contact_id) {
+    try {
+      await addContactsToNycList([application.contact_id]);
+    } catch (error) {
+      console.warn(`GomryWebhook: chapter-list add failed for ${email}: ${error.message}`);
+    }
+  }
+
+  return email;
+}
 
 /**
  * GET /api/community/admin — pending profiles + email-claim requests (admin only)

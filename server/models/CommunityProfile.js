@@ -160,6 +160,17 @@ const communityProfileSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Provenance for members created by the Gomry sync (approval on the
+  // application form). Unique so a redelivered webhook or a re-run of the
+  // backfill can't create a second profile for the same submission.
+  gomryApplicationId: {
+    type: String,
+    default: null,
+  },
+  gomryContactId: {
+    type: String,
+    default: null,
+  },
   manageTokenHash: {
     type: String,
     default: null,
@@ -194,6 +205,7 @@ communityProfileSchema.index({ status: 1 });
 communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterExpression: { memberNumber: { $type: 'number' } } });
 communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
 communityProfileSchema.index({ cardSlug: 1 }, { unique: true, partialFilterExpression: { cardSlug: { $type: 'string' } } });
+communityProfileSchema.index({ gomryApplicationId: 1 }, { unique: true, partialFilterExpression: { gomryApplicationId: { $type: 'string' } } });
 
 const CommunityProfile = mongoose.model('CommunityProfile', communityProfileSchema);
 

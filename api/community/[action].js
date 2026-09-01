@@ -1,5 +1,13 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+// Pure fetch/mapping helpers — no mongoose, so importing them here cannot
+// collide with this file's own model registrations.
+import {
+  profileFromApplication,
+  isNycApplication,
+  getApplication,
+  addContactsToNycList,
+} from '../../server/utils/gomry.js';
 
 /**
  * Consolidated community API. Vercel Hobby caps a deployment at 12 serverless
@@ -69,6 +77,8 @@ const communityProfileSchema = new mongoose.Schema({
   lastClaimEmailAt: { type: Date, default: null },
   claimEmailCount: { type: Number, default: 0 },
   gdprConsent: { type: Boolean, default: false },
+  gomryApplicationId: { type: String, default: null },
+  gomryContactId: { type: String, default: null },
   manageTokenHash: { type: String, default: null },
   manageTokenExpiry: { type: Date, default: null },
   pendingEmail: { type: String, lowercase: true, trim: true, default: null },
@@ -81,6 +91,7 @@ const communityProfileSchema = new mongoose.Schema({
 communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterExpression: { memberNumber: { $type: 'number' } } });
 communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
 communityProfileSchema.index({ cardSlug: 1 }, { unique: true, partialFilterExpression: { cardSlug: { $type: 'string' } } });
+communityProfileSchema.index({ gomryApplicationId: 1 }, { unique: true, partialFilterExpression: { gomryApplicationId: { $type: 'string' } } });
 
 const emailClaimRequestSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
@@ -1356,7 +1367,71 @@ async function handleGomryWebhook(req, res) {
   // Logged so the first deliveries are visible in Vercel logs without a DB round-trip.
   console.log(`GomryWebhook: stored ${channel} delivery ${event._id} (keys: ${Object.keys(payload).join(', ') || 'none'})`);
 
+  // Best-effort: an approval should become a member immediately. Never allowed to
+  // fail the response — Gomry redelivers on non-2xx, and `npm run sync:gomry`
+  // reconciles anything this misses (a Gomry timeout inside Vercel's 10s cap,
+  // an unfamiliar payload), so dropping one here costs latency, not data.
+  if (channel === 'application') {
+    try {
+      const applied = await applyApplicationDelivery(payload, event);
+      if (applied) console.log(`GomryWebhook: synced member ${applied}`);
+    } catch (error) {
+      console.error('GomryWebhook: processing failed:', error.message);
+      await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processError: error.message } });
+    }
+  }
+
   return res.status(200).json({ success: true });
+}
+
+/**
+ * Turn one application delivery into an NYC member, if that's what it is.
+ * Returns the email synced, or null when the delivery isn't an accepted New York
+ * approval.
+ *
+ * Prefers the delivered body and only calls Gomry when the payload lacks the
+ * answers or the applicant email — Gomry's REST latency swings past 10s often
+ * enough that an avoidable round-trip is worth avoiding inside a function.
+ */
+async function applyApplicationDelivery(payload, event) {
+  const body = payload.data || payload.application || payload;
+  const applicationId = body.id || body.application_id || null;
+
+  let application = body;
+  const usable = Array.isArray(body.answers) && body.applicant?.email;
+  if (!usable) {
+    if (!applicationId) return null;
+    application = await getApplication(applicationId);
+  }
+
+  if (String(application.status || '').toLowerCase() !== 'accepted') return null;
+  if (!isNycApplication(application)) return null;
+
+  // The contact payload carries `img`; an application one doesn't. Photos are
+  // otherwise `npm run backfill:pics`.
+  const doc = profileFromApplication(application, body.contact || null);
+  if (!doc) return null;
+
+  const { email, seeded, gomryApplicationId, gomryContactId, ...content } = doc;
+  await CommunityProfile.updateOne(
+    { email },
+    { $setOnInsert: content, $set: { seeded, gomryApplicationId, gomryContactId } },
+    { upsert: true },
+  );
+
+  await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processedAt: new Date() } });
+
+  // MCP-only, and the one call that dies on a revoked token — so it goes last
+  // and its failure is logged rather than thrown.
+  if (application.contact_id) {
+    try {
+      await addContactsToNycList([application.contact_id]);
+    } catch (error) {
+      console.warn(`GomryWebhook: chapter-list add failed for ${email}: ${error.message}`);
+    }
+  }
+
+  return email;
 }
 
 export default async function handler(req, res) {

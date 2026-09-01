@@ -16,7 +16,8 @@
     "backfill:pics": "node scripts/backfill-profile-pics.js",
     "collect:pics": "node scripts/collect-linkedin-pics.js",
     "seed:posto-fisso": "node scripts/seed-posto-fisso.js",
-    "inspect:gomry": "node scripts/inspect-gomry-webhooks.js"
+    "inspect:gomry": "node scripts/inspect-gomry-webhooks.js",
+    "sync:gomry": "node scripts/sync-gomry-members.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
