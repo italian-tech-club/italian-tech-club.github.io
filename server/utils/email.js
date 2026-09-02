@@ -2,10 +2,27 @@ export const SITE_URL = process.env.SITE_URL || 'http://localhost:5173';
 export const FROM_EMAIL = process.env.SPONSOR_FROM_EMAIL || 'ITC Website <onboarding@resend.dev>';
 
 /**
+ * Addresses to copy on member-facing mail, from MEMBER_EMAIL_BCC
+ * (comma-separated). Unset means no BCC.
+ *
+ * NOT applied by default, and must not be: most mail from here carries a
+ * single-use sign-in token, and a copy of one lets the recipient sign in AS
+ * that member. Call sites opt in explicitly (`bcc: BCC_EMAILS`) and only where
+ * that is acceptable.
+ */
+export const BCC_EMAILS = (process.env.MEMBER_EMAIL_BCC || '')
+  .split(',')
+  .map((address) => address.trim())
+  .filter(Boolean);
+
+/**
  * Send an email via the Resend REST API. Returns false (without throwing)
  * when RESEND_API_KEY is missing or the API call fails.
+ *
+ * Pass `bcc: BCC_EMAILS` to copy the configured admin addresses — see the
+ * warning on that constant before doing so.
  */
-export async function sendEmail({ to, subject, html, replyTo }) {
+export async function sendEmail({ to, subject, html, replyTo, bcc = [] }) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('⚠️ RESEND_API_KEY not set — email not sent:', subject);
     return false;
@@ -23,6 +40,7 @@ export async function sendEmail({ to, subject, html, replyTo }) {
       subject,
       html,
       ...(replyTo ? { reply_to: replyTo } : {}),
+      ...(bcc?.length ? { bcc } : {}),
     }),
   });
 
@@ -88,6 +106,7 @@ export async function sendEmailBatch(messages) {
     subject: m.subject,
     html: m.html,
     ...(m.replyTo ? { reply_to: m.replyTo } : {}),
+    ...(m.bcc?.length ? { bcc: m.bcc } : {}),
   }));
 
   try {

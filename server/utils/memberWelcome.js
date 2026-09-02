@@ -14,7 +14,7 @@
  * server/models here would double-register the mongoose model and throw.
  */
 import crypto from 'crypto';
-import { sendEmail, campaignHtml, fillTemplate, SITE_URL } from './email.js';
+import { sendEmail, campaignHtml, fillTemplate, SITE_URL, BCC_EMAILS } from './email.js';
 
 // Matches APPROVAL_TOKEN_TTL_MS in the community route — the sign-in link in an
 // acceptance email is good for a week.
@@ -76,7 +76,10 @@ export async function sendMemberWelcome({ profile, model }) {
     );
 
     const { subject, html } = renderMemberWelcome({ profile, link });
-    const ok = await sendEmail({ to: profile.email, subject, html });
+    // Copied to MEMBER_EMAIL_BCC so an admin sees what new members receive.
+    // Note this shares the member's claim token with those addresses — fine for
+    // a welcome nobody has acted on yet, which is why it is opt-in per call site.
+    const ok = await sendEmail({ to: profile.email, subject, html, bcc: BCC_EMAILS });
 
     if (!ok) return 'failed';
 
