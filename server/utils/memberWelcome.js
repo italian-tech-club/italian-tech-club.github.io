@@ -32,6 +32,24 @@ We've already created your member profile from your application, so there's noth
 Click below to sign in and claim your profile. The link expires in 7 days.`;
 
 /**
+ * The exact subject + HTML a member receives, for a given claim link.
+ *
+ * Split out so a preview send renders through the same path as the real thing —
+ * a hand-copied test email drifts from production the first time the copy changes.
+ */
+export function renderMemberWelcome({ profile, link }) {
+  const context = { firstName: profile.firstName, lastName: profile.lastName, link };
+  return {
+    subject: SUBJECT,
+    html: campaignHtml({
+      bodyHtml: fillTemplate(BODY, context),
+      link,
+      buttonLabel: BUTTON_LABEL,
+    }),
+  };
+}
+
+/**
  * Send the welcome/claim email for one freshly created profile.
  *
  * Returns 'sent', 'already-notified' (a welcome or claim email has gone out
@@ -44,7 +62,6 @@ export async function sendMemberWelcome({ profile, model }) {
 
   const token = crypto.randomBytes(32).toString('hex');
   const link = `${SITE_URL}/community/manage?token=${token}`;
-  const context = { firstName: profile.firstName, lastName: profile.lastName, link };
 
   try {
     // Token first, so the link already works when the mail lands.
@@ -58,15 +75,8 @@ export async function sendMemberWelcome({ profile, model }) {
       },
     );
 
-    const ok = await sendEmail({
-      to: profile.email,
-      subject: SUBJECT,
-      html: campaignHtml({
-        bodyHtml: fillTemplate(BODY, context),
-        link,
-        buttonLabel: BUTTON_LABEL,
-      }),
-    });
+    const { subject, html } = renderMemberWelcome({ profile, link });
+    const ok = await sendEmail({ to: profile.email, subject, html });
 
     if (!ok) return 'failed';
 
