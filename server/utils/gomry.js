@@ -57,6 +57,11 @@ export const NYC_HUB = 'New York';
 // point somewhere harmless.
 export const NYC_LIST_ID = process.env.GOMRY_NYC_LIST_ID || 'py32np2ddjXjTUyauxKz';
 
+// "All Members (Approved)" — Gomry adds a contact to this on acceptance, which
+// is the only signal an approval actually emits. The application webhook fires
+// on submission, not on approval, so this list is the real trigger.
+export const APPROVED_LIST_ID = process.env.GOMRY_APPROVED_LIST_ID || '5I5JVBIDqLUgKwyPLbwp';
+
 // Gomry has accepted all of these for the same consent question over time.
 // Anything else — including a blank answer — is treated as consent withheld.
 const GDPR_CONSENT_VALUES = new Set(['accetto', 'true', 'yes', 'accept', 'i accept']);
@@ -247,6 +252,64 @@ export async function listAcceptedApplications({ submittedAfter = null, formId =
   const byId = new Map();
   for (const application of applications) byId.set(application.id, application);
   return [...byId.values()];
+}
+
+/**
+ * The webhook payloads, normalised.
+ *
+ * Gomry's webhook bodies share no field names with its REST resources:
+ * `applicationID` not `id`, `responseStatus` not `status`, `user` not
+ * `applicant`, and `applicationAnswers` is an object keyed by LOCALISED
+ * question text rather than an array carrying `question_id`. That last part is
+ * why nothing here tries to read answers from a delivery — the id is extracted
+ * and the authoritative application is fetched from REST instead.
+ */
+export function normalizeApplicationDelivery(payload = {}) {
+  const body = payload.data || payload.application || payload;
+  return {
+    applicationId: body.applicationID || body.application_id || body.id || null,
+    // "Pending" on a fresh submission, "Accepted" once an admin approves.
+    status: body.responseStatus || body.status || null,
+    contactId: body.user?.contactID || body.contact_id || null,
+    email: (body.user?.email || body.applicant?.email || '').toLowerCase() || null,
+    isNewApplication: Boolean(body.isNewApplication),
+    updatedByAdmin: Boolean(body.updatedByAdmin),
+  };
+}
+
+export function normalizeContactDelivery(payload = {}) {
+  const body = payload.data || payload.contact || payload;
+  return {
+    contactId: body.id || body.contact_id || null,
+    email: (body.userEmail || body.email || '').toLowerCase() || null,
+    lists: Array.isArray(body.lists) ? body.lists : [],
+    img: body.img || null,
+  };
+}
+
+/** True when a contact delivery says this contact is now an approved member. */
+export function isApprovedMemberDelivery(payload) {
+  return normalizeContactDelivery(payload).lists.includes(APPROVED_LIST_ID);
+}
+
+/**
+ * The contact's accepted submission to the membership form, or null.
+ *
+ * One REST call, and it returns the full application with `question_id`s and
+ * `applicant.email` — everything the member mapping needs.
+ */
+export async function acceptedApplicationForContact(contactId, { formId = MEMBERSHIP_FORM_ID } = {}) {
+  if (!contactId) return null;
+  const body = await restGet('/applications', {
+    contact_id: contactId,
+    status: 'Accepted',
+    form_id: formId,
+    page_size: 100,
+  });
+  const applications = body.data || [];
+  if (!applications.length) return null;
+  // Newest wins if someone applied more than once.
+  return applications.sort((a, b) => new Date(b.submitted_at ?? 0) - new Date(a.submitted_at ?? 0))[0];
 }
 
 export async function getApplication(applicationId) {

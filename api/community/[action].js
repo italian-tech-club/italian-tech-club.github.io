@@ -7,6 +7,10 @@ import {
   isNycApplication,
   getApplication,
   addContactsToNycList,
+  acceptedApplicationForContact,
+  normalizeApplicationDelivery,
+  normalizeContactDelivery,
+  APPROVED_LIST_ID,
 } from '../../server/utils/gomry.js';
 import { sendMemberWelcome } from '../../server/utils/memberWelcome.js';
 
@@ -1372,45 +1376,29 @@ async function handleGomryWebhook(req, res) {
   // fail the response — Gomry redelivers on non-2xx, and `npm run sync:gomry`
   // reconciles anything this misses (a Gomry timeout inside Vercel's 10s cap,
   // an unfamiliar payload), so dropping one here costs latency, not data.
-  if (channel === 'application') {
-    try {
-      const applied = await applyApplicationDelivery(payload, event);
-      if (applied) console.log(`GomryWebhook: synced member ${applied}`);
-    } catch (error) {
-      console.error('GomryWebhook: processing failed:', error.message);
-      await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processError: error.message } });
-    }
+  try {
+    const applied = channel === 'application' ? await applyApplicationDelivery(payload, event)
+      : channel === 'contact' ? await applyContactDelivery(payload, event)
+      : null;
+    if (applied) console.log(`GomryWebhook: synced member ${applied.email}${applied.created ? ' (new)' : ''}`);
+  } catch (error) {
+    console.error('GomryWebhook: processing failed:', error.message);
+    await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processError: error.message } });
   }
 
   return res.status(200).json({ success: true });
 }
 
 /**
- * Turn one application delivery into an NYC member, if that's what it is.
- * Returns the email synced, or null when the delivery isn't an accepted New York
- * approval.
+ * Sync one accepted application into an NYC member. Shared by both channels.
  *
- * Prefers the delivered body and only calls Gomry when the payload lacks the
- * answers or the applicant email — Gomry's REST latency swings past 10s often
- * enough that an avoidable round-trip is worth avoiding inside a function.
+ * Returns {email, created} when it acted, else null.
  */
-async function applyApplicationDelivery(payload, event) {
-  const body = payload.data || payload.application || payload;
-  const applicationId = body.id || body.application_id || null;
-
-  let application = body;
-  const usable = Array.isArray(body.answers) && body.applicant?.email;
-  if (!usable) {
-    if (!applicationId) return null;
-    application = await getApplication(applicationId);
-  }
-
+async function syncMemberFromApplication(application, { event = null, contact = null } = {}) {
   if (String(application.status || '').toLowerCase() !== 'accepted') return null;
   if (!isNycApplication(application)) return null;
 
-  // The contact payload carries `img`; an application one doesn't. Photos are
-  // otherwise `npm run backfill:pics`.
-  const doc = profileFromApplication(application, body.contact || null);
+  const doc = profileFromApplication(application, contact);
   if (!doc) return null;
 
   const { email, seeded, gomryApplicationId, gomryContactId, ...content } = doc;
@@ -1420,23 +1408,24 @@ async function applyApplicationDelivery(payload, event) {
     { upsert: true },
   );
 
-  await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processedAt: new Date() } });
+  if (event) {
+    await GomryWebhookEvent.updateOne({ _id: event._id }, { $set: { processedAt: new Date() } });
+  }
 
-  // Acceptance on Gomry is the whole approval now, so the member has no idea a
+  // Gomry acceptance is the whole approval now, so the member has no idea a
   // profile exists until we say so. Only on a genuine insert, and the helper
-  // refuses anyone already emailed — a redelivered webhook must not mail twice.
+  // refuses anyone already emailed.
   if (result.upsertedCount > 0) {
     const profile = await CommunityProfile.findOne({ email })
       .select('firstName lastName email claimEmailCount lastClaimEmailAt')
       .lean();
     if (profile) {
       const outcome = await sendMemberWelcome({ profile, model: CommunityProfile });
-      console.log(`GomryWebhook: welcome email for ${email} → ${outcome}`);
+      console.log(`GomryWebhook: welcome email for ${email} -> ${outcome}`);
     }
   }
 
-  // MCP-only, and the one call that dies on a revoked token — so it goes last
-  // and its failure is logged rather than thrown.
+  // MCP-only and the one call that dies on a revoked token, so it goes last.
   if (application.contact_id) {
     try {
       await addContactsToNycList([application.contact_id]);
@@ -1445,7 +1434,47 @@ async function applyApplicationDelivery(payload, event) {
     }
   }
 
-  return email;
+  return { email, created: result.upsertedCount > 0 };
+}
+
+/**
+ * An application delivery. Gomry sends these on SUBMISSION (responseStatus
+ * "Pending"), not on approval, so this path mostly declines — but it still
+ * handles an accepted one correctly if Gomry ever emits it.
+ *
+ * The delivery's own answers are never read: `applicationAnswers` is keyed by
+ * localised question text, so the application is re-fetched from REST where the
+ * stable question_ids and `applicant.email` live.
+ */
+async function applyApplicationDelivery(payload, event) {
+  const { applicationId, status } = normalizeApplicationDelivery(payload);
+  if (!applicationId) return null;
+  if (status && status.toLowerCase() !== 'accepted') return null;
+
+  const application = await getApplication(applicationId);
+  return syncMemberFromApplication(application, { event });
+}
+
+/**
+ * A contact delivery — the real approval trigger.
+ *
+ * Accepting an applicant adds their contact to "All Members (Approved)" and
+ * fires this, which is the only webhook an approval actually produces.
+ */
+async function applyContactDelivery(payload, event) {
+  const { contactId, lists, img } = normalizeContactDelivery(payload);
+  if (!contactId || !lists.includes(APPROVED_LIST_ID)) return null;
+
+  // Contact deliveries arrive in bursts — one list-add produced seven for the
+  // same person — so skip the REST round-trip for a contact already synced.
+  const known = await CommunityProfile.findOne({ gomryContactId: contactId }).select('_id').lean();
+  if (known) return null;
+
+  const application = await acceptedApplicationForContact(contactId);
+  if (!application) return null;
+
+  // A contact delivery carries `img`, which an application one doesn't.
+  return syncMemberFromApplication(application, { event, contact: { img } });
 }
 
 export default async function handler(req, res) {
