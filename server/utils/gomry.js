@@ -10,11 +10,14 @@
  *    returns an applicant's email: `GET /applications` embeds
  *    `applicant: {email, first_name, last_name}`, and `GET /contacts` backfills
  *    those from the linked user account. Everything the sync reads comes from here.
- *  - GOMRY_MCP_TOKEN → MCP (https://www.gomry.com/api/mcp). Needed only for
- *    `add_contacts_to_list`; REST's PATCH /contacts rejects a `lists` field, so
- *    chapter-list membership has no REST equivalent. MCP tokens have been observed
- *    getting revoked without notice, so callers must treat list-add as best-effort
- *    and never let it block profile creation.
+ *  - GOMRY_MCP_TOKEN → MCP (https://www.gomry.com/api/mcp). The only surface that
+ *    can WRITE the two things the admin panel needs: `add_contacts_to_list`
+ *    (REST's PATCH /contacts rejects a `lists` field) and `set_application_status`
+ *    (REST's PATCH /applications writes `metadata` only and refuses `status`,
+ *    because status drives acceptance emails and list membership). MCP tokens have
+ *    been observed getting revoked without notice, so list-add is best-effort and
+ *    must never block profile creation — but an approval genuinely cannot happen
+ *    without a live token, and says so rather than failing quietly.
  *
  * Deliberately free of mongoose so both the express route and the Vercel function
  * can import it — the question-id map below must not exist in two copies.
@@ -61,6 +64,10 @@ export const NYC_LIST_ID = process.env.GOMRY_NYC_LIST_ID || 'py32np2ddjXjTUyauxK
 // is the only signal an approval actually emits. The application webhook fires
 // on submission, not on approval, so this list is the real trigger.
 export const APPROVED_LIST_ID = process.env.GOMRY_APPROVED_LIST_ID || '5I5JVBIDqLUgKwyPLbwp';
+
+// The three states `set_application_status` moves a submission between. "Draft"
+// exists on Gomry too but is the applicant's own unfinished form, not a verdict.
+export const APPLICATION_STATUSES = ['Pending', 'Accepted', 'Rejected'];
 
 // Gomry has accepted all of these for the same consent question over time.
 // Anything else — including a blank answer — is treated as consent withheld.
@@ -227,10 +234,66 @@ export function profileFromApplication(application, contact = null) {
 }
 
 /**
- * Every accepted submission to the membership form, following pagination.
+ * One answer as display text.
+ *
+ * Gomry types an answer by its question widget, so the same `answer` field is a
+ * string, an array (multi-select custom fields), an organization
+ * `{value, logo, type}`, or a Google Places blob for a location question. The
+ * review screen wants one line for each, and nothing else in this module has
+ * ever needed the location or expertise answers — the sync reads only the four
+ * that map onto profile fields.
+ */
+export function plainAnswer(application, key) {
+  const answer = answerOf(application, key);
+  if (answer === null || answer === undefined) return '';
+  if (Array.isArray(answer)) return answer.map((item) => String(item ?? '').trim()).filter(Boolean).join(', ');
+  if (typeof answer === 'object') {
+    return String(answer.value ?? answer.formattedAddress ?? answer.city ?? '').trim();
+  }
+  return String(answer).trim();
+}
+
+/**
+ * One application flattened for the admin review screen — every answer the
+ * reviewer reads before deciding, plus the identifiers the decision needs.
+ *
+ * Distinct from `profileFromApplication`, which produces the member record. This
+ * one is lossless-ish and read-only: it keeps `motivation` and `special`
+ * separate (the profile mapping collapses them into one bio), carries the
+ * referral and WhatsApp answers the directory has no field for, and surfaces
+ * `gdprConsent` because a "Non accetto" applicant becomes an `unclaimed` profile
+ * that stays out of the directory — worth knowing before you approve.
+ */
+export function reviewFromApplication(application) {
+  const applicant = application.applicant || {};
+  return {
+    id: application.id,
+    contactId: application.contact_id || null,
+    status: application.status || null,
+    submittedAt: application.submitted_at || application.created_at || null,
+    email: String(applicant.email || '').trim().toLowerCase(),
+    firstName: String(applicant.first_name || '').trim(),
+    lastName: String(applicant.last_name || '').trim(),
+    hub: plainAnswer(application, 'hub'),
+    city: plainAnswer(application, 'city'),
+    company: plainAnswer(application, 'company'),
+    jobTitle: plainAnswer(application, 'jobTitle'),
+    linkedIn: plainAnswer(application, 'linkedin'),
+    whatsapp: plainAnswer(application, 'whatsapp'),
+    expertise: plainAnswer(application, 'expertise'),
+    referral: plainAnswer(application, 'referral'),
+    special: plainAnswer(application, 'special'),
+    motivation: plainAnswer(application, 'motivation'),
+    bio: bioFromApplication(application),
+    gdprConsent: hasGdprConsent(application),
+  };
+}
+
+/**
+ * Every submission to the membership form with one status, following pagination.
  * `submittedAfter` (ISO string) narrows an incremental run.
  */
-export async function listAcceptedApplications({ submittedAfter = null, formId = MEMBERSHIP_FORM_ID } = {}) {
+export async function listApplications({ status, submittedAfter = null, formId = MEMBERSHIP_FORM_ID } = {}) {
   const applications = [];
   let page = 1;
   let totalPages = 1;
@@ -238,7 +301,7 @@ export async function listAcceptedApplications({ submittedAfter = null, formId =
   do {
     const body = await restGet('/applications', {
       form_id: formId,
-      status: 'Accepted',
+      status,
       page,
       page_size: 100,
       submitted_after: submittedAfter,
@@ -248,11 +311,13 @@ export async function listAcceptedApplications({ submittedAfter = null, formId =
     page += 1;
   } while (page <= totalPages);
 
-  // Someone can submit the form twice; the newest accepted submission wins.
+  // Someone can submit the form twice; the newest submission wins.
   const byId = new Map();
   for (const application of applications) byId.set(application.id, application);
   return [...byId.values()];
 }
+
+export const listAcceptedApplications = (options = {}) => listApplications({ ...options, status: 'Accepted' });
 
 /**
  * The webhook payloads, normalised.
@@ -341,6 +406,59 @@ export async function listContactsWithImages(listId = NYC_LIST_ID) {
   } while (page <= totalPages);
 
   return contacts;
+}
+
+/**
+ * Approve, reject, or return submissions to review — the write that used to
+ * require the Gomry dashboard.
+ *
+ * `notify_applicant` has no default on Gomry's side precisely so a batch can
+ * never mail people by omission, and this keeps that contract: the flag must be
+ * passed explicitly or the call is refused before it leaves the process. True
+ * sends the form's own acceptance/rejection template (and, on acceptance, adds
+ * the contact to the form's accepted lists, which is what fires our contact
+ * webhook); false moves the status silently.
+ *
+ * Per-id problems come back in `failed` ([{applicationId, reason}]) rather than
+ * throwing, so a caller acting on one application must check that a resolved
+ * promise actually moved it — `updated` is the list that did.
+ */
+export async function setApplicationStatus(applicationIds, status, { notifyApplicant } = {}) {
+  const ids = [...new Set((applicationIds || []).filter(Boolean))];
+  if (!ids.length) return { updated: [], failed: [] };
+  if (!APPLICATION_STATUSES.includes(status)) throw new Error(`Unsupported application status: ${status}`);
+  if (typeof notifyApplicant !== 'boolean') throw new Error('notifyApplicant must be an explicit boolean');
+
+  const body = await mcpCall('set_application_status', {
+    application_ids: ids,
+    status,
+    notify_applicant: notifyApplicant,
+  });
+
+  // This tool nests its result under `data`, unlike add_contacts_to_list — so
+  // unwrap here rather than leaving every caller to remember which is which.
+  const result = body?.data || body || {};
+  return { updated: result.updated || [], failed: result.failed || [] };
+}
+
+/**
+ * Move ONE application and say whether it actually moved.
+ *
+ * The bulk call reports per-id problems in `failed` rather than throwing, so
+ * "the promise resolved" is not the same as "the status changed". This collapses
+ * that into the yes/no a single decision needs, and keeps the shape of Gomry's
+ * bulk reply in this module rather than in every caller.
+ */
+export async function setOneApplicationStatus(applicationId, status, options) {
+  const { updated, failed } = await setApplicationStatus([applicationId], status, options);
+
+  const failure = failed.find((f) => (f?.applicationId || f?.id) === applicationId) || failed[0];
+  if (failure) return { ok: false, reason: failure.reason || failure.error || failure.message || 'no reason given' };
+  // Every id comes back in one list or the other, so an empty `updated` here
+  // means Gomry accepted the call and did nothing.
+  if (!updated.length) return { ok: false, reason: 'Gomry reported no change' };
+
+  return { ok: true, reason: null };
 }
 
 /**

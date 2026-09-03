@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Loader2, Mail, Linkedin, Calendar, Inbox, Check, X, UserPlus, ArrowRight, AlertCircle,
-  Users, Send, RefreshCw,
+  Users, Send, RefreshCw, ImageOff,
 } from 'lucide-react';
+import PhotoGrabber from './PhotoGrabber';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -39,6 +40,7 @@ const FILTERS = [
   { key: 'unclaimed', label: 'Unclaimed', test: (m) => !m.claimed },
   { key: 'seededUnclaimed', label: 'Seeded & unclaimed', test: (m) => m.seeded && !m.claimed },
   { key: 'neverEmailed', label: 'Never emailed', test: (m) => !m.lastClaimEmailAt },
+  { key: 'noPhoto', label: 'No photo', test: (m) => !m.hasPhoto },
   { key: 'claimed', label: 'Claimed', test: (m) => m.claimed },
 ];
 
@@ -66,6 +68,8 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
   const [subject, setSubject] = useState(DEFAULT_SUBJECT);
   const [body, setBody] = useState(DEFAULT_BODY);
   const [testEmail, setTestEmail] = useState('');
+  const [photoFor, setPhotoFor] = useState(null); // member id whose photo row is open
+  const [photoMsg, setPhotoMsg] = useState('');
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState('');
 
@@ -107,6 +111,29 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
       await fetchData();
     } catch {
       alert('Could not reach the server.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Replace one member's photo with whatever the admin pasted, dropped or picked.
+  const savePhoto = async (member, payload) => {
+    setBusyId(member._id);
+    setPhotoMsg('');
+    try {
+      const response = await fetch(`${API_URL}/api/community/admin`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ action: 'set-profile-photo', profileId: member._id, ...payload }),
+      });
+      if (response.status === 401) return onUnauthorized();
+      const data = await response.json();
+      setPhotoMsg(data.message || (data.success ? 'Photo saved.' : 'Photo failed.'));
+      // The row stays open on success so the message and the now-green tick are
+      // both visible; the roster refetch is what flips `hasPhoto`.
+      if (data.success) await fetchData();
+    } catch {
+      setPhotoMsg('Could not reach the server.');
     } finally {
       setBusyId(null);
     }
@@ -239,12 +266,13 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
       {tab === 'members' && (
         <div className="space-y-8">
           {stats && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label="Total" value={stats.total} />
               <StatCard label="Claimed" value={stats.claimed} accent="text-itc-green" />
               <StatCard label="Unclaimed" value={stats.unclaimed} accent="text-amber-600 dark:text-amber-400" />
               <StatCard label="Seeded · unclaimed" value={stats.seededUnclaimed} />
               <StatCard label="Pending" value={(stats.byStatus && stats.byStatus.pending) || 0} />
+              <StatCard label="No photo" value={stats.noPhoto ?? 0} accent="text-amber-600 dark:text-amber-400" />
             </div>
           )}
 
@@ -333,6 +361,7 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
                     <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} className="accent-itc-green" />
                   </th>
                   <th className="p-3 text-left">Member</th>
+                  <th className="p-3 text-left">Photo</th>
                   <th className="p-3 text-left">Status</th>
                   <th className="p-3 text-left">Claimed</th>
                   <th className="p-3 text-left">#</th>
@@ -341,9 +370,10 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">No members match this filter.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">No members match this filter.</td></tr>
                 ) : filtered.map((m) => (
-                  <tr key={m._id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                  <React.Fragment key={m._id}>
+                  <tr className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30">
                     <td className="p-3">
                       <input type="checkbox" checked={selected.has(m._id)} onChange={() => toggleOne(m._id)} className="accent-itc-green" />
                     </td>
@@ -354,6 +384,18 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
                         {m.seeded && <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500">seeded</span>}
                         {!m.emailVerified && <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">unverified</span>}
                       </div>
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => { setPhotoMsg(''); setPhotoFor(photoFor === m._id ? null : m._id); }}
+                        title={m.hasPhoto ? 'Replace this photo' : 'Add a photo from their LinkedIn'}
+                        className={`inline-flex items-center gap-1 text-xs font-bold transition-colors ${
+                          m.hasPhoto ? 'text-itc-green hover:text-emerald-700' : 'text-amber-600 dark:text-amber-400 hover:text-amber-500'
+                        }`}
+                      >
+                        {m.hasPhoto ? <Check className="w-4 h-4" /> : <ImageOff className="w-4 h-4" />}
+                        {photoFor === m._id ? 'close' : 'fix'}
+                      </button>
                     </td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_STYLE[m.status] || ''}`}>{m.status}</span>
@@ -368,6 +410,31 @@ const AdminCommunity = ({ authHeaders, onUnauthorized }) => {
                       {relTime(m.lastClaimEmailAt)}{m.claimEmailCount ? ` (${m.claimEmailCount}×)` : ''}
                     </td>
                   </tr>
+                  {photoFor === m._id && (
+                    <tr className="bg-slate-50 dark:bg-slate-800/30">
+                      <td colSpan={7} className="p-4">
+                        <div className="flex items-center gap-4">
+                          <PhotoGrabber
+                            linkedIn={m.linkedIn}
+                            initials={`${m.firstName?.[0] || ''}${m.lastName?.[0] || ''}`.toUpperCase()}
+                            hasPhoto={m.hasPhoto}
+                            hint={m.hasPhoto ? 'has a photo' : 'no photo yet'}
+                            busy={busyId === m._id}
+                            onPhoto={(payload) => savePhoto(m, payload)}
+                            onError={setPhotoMsg}
+                          />
+                          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                            <p>
+                              Open their LinkedIn, right-click the profile photo, <strong>Copy Image</strong>, then click
+                              the frame and press ⌘V. Dragging the photo straight onto the frame works too.
+                            </p>
+                            {photoMsg && <p className="text-slate-700 dark:text-slate-200 font-medium">{photoMsg}</p>}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

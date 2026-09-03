@@ -11,7 +11,13 @@ import {
   normalizeApplicationDelivery,
   normalizeContactDelivery,
   APPROVED_LIST_ID,
+  listApplications,
+  reviewFromApplication,
+  setOneApplicationStatus,
+  APPLICATION_STATUSES,
+  NYC_HUB,
 } from '../../server/utils/gomry.js';
+import { resolveProfilePhoto, photoUpdate } from '../../server/utils/profilePhoto.js';
 import { sendMemberWelcome } from '../../server/utils/memberWelcome.js';
 
 /**
@@ -26,6 +32,7 @@ import { sendMemberWelcome } from '../../server/utils/memberWelcome.js';
  *   GET    /api/community/card              (public: shareable member card)
  *   POST   /api/community/claim-request
  *   GET|POST /api/community/admin           (admin session required)
+ *   GET|POST /api/community/gomry-admin     (admin session required; Gomry application queue)
  *   POST   /api/community/gomry-webhook     (Gomry deliveries; shared secret in ?secret=)
  * The segment after /community/ arrives as req.query.action.
  * (Mirror of server/routes/community.js used by the local express server.)
@@ -1090,9 +1097,16 @@ async function handleAdmin(req, res) {
     // Full roster for the members dashboard + claim campaign. Small collection,
     // so we compute stats in JS from the same array (no extra round-trip).
     const members = await CommunityProfile.find({})
-      .select('firstName lastName email status seeded claimed emailVerified memberNumber viewCount lastClaimEmailAt claimEmailCount createdAt')
+      .select('firstName lastName email linkedIn status seeded claimed emailVerified memberNumber viewCount lastClaimEmailAt claimEmailCount createdAt')
       .sort({ createdAt: -1 })
       .lean();
+
+    // Photos are megabytes of base64 apiece, so the roster reports only whether
+    // one exists — selecting the field itself would put ~100MB on the wire to
+    // render a column of ticks.
+    const withPhoto = await CommunityProfile.find({ profilePic: { $nin: [null, ''] } }).select('_id').lean();
+    const photoIds = new Set(withPhoto.map((p) => String(p._id)));
+    for (const member of members) member.hasPhoto = photoIds.has(String(member._id));
 
     const stats = {
       total: members.length,
@@ -1101,6 +1115,7 @@ async function handleAdmin(req, res) {
       seeded: members.filter((m) => m.seeded).length,
       seededUnclaimed: members.filter((m) => m.seeded && !m.claimed).length,
       neverEmailed: members.filter((m) => !m.lastClaimEmailAt).length,
+      noPhoto: members.filter((m) => !m.hasPhoto).length,
       byStatus: members.reduce((acc, m) => { acc[m.status] = (acc[m.status] || 0) + 1; return acc; }, {}),
     };
 
@@ -1196,6 +1211,28 @@ async function handleAdmin(req, res) {
       request.resolvedAt = new Date();
       await request.save();
       return res.status(200).json({ success: true, message: 'Claim request rejected.' });
+    }
+
+    // Replace one member's photo with an image the admin has in hand — the
+    // browser-side half of scripts/collect-linkedin-pics.js, for the members who
+    // are already in and still showing initials.
+    if (action === 'set-profile-photo') {
+      let photo;
+      try {
+        photo = await resolveProfilePhoto(req.body);
+      } catch (photoError) {
+        return res.status(400).json({ success: false, message: photoError.message });
+      }
+      if (!photo) return res.status(400).json({ success: false, message: 'No image supplied.' });
+
+      const profile = await CommunityProfile.findByIdAndUpdate(
+        req.body.profileId,
+        { $set: photoUpdate(photo) },
+        { new: true },
+      ).select('firstName lastName');
+      if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
+
+      return res.status(200).json({ success: true, message: `Photo updated for ${profile.firstName} ${profile.lastName}.` });
     }
 
     // Batch claim/welcome email to selected members. Each recipient gets a fresh
@@ -1306,6 +1343,191 @@ async function handleAdmin(req, res) {
   }
 
   return res.status(405).json({ success: false, message: 'Method not allowed' });
+}
+
+// How far back the review screen looks for already-decided applications. Long
+// enough to undo last week's mistake or fix a new member's photo, short enough
+// that the Accepted query stays one page of a 500-row collection.
+const DECISION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** NY-hub applications for one status, newest first, flattened for review. */
+async function nycApplications(status, options = {}) {
+  const applications = await listApplications({ ...options, status });
+  return applications
+    .filter(isNycApplication)
+    .map(reviewFromApplication)
+    .sort((a, b) => new Date(b.submittedAt ?? 0) - new Date(a.submittedAt ?? 0));
+}
+
+/**
+ * Whether each of these applicants already has a member profile, keyed by email.
+ *
+ * The review screen needs it twice over: to show that an approval landed, and to
+ * know whether a pasted photo can be saved now or has to wait for the approval
+ * that creates the profile.
+ */
+async function membersByEmail(reviews) {
+  const emails = [...new Set(reviews.map((r) => r.email).filter(Boolean))];
+  if (!emails.length) return {};
+
+  const profiles = await CommunityProfile.find({ email: { $in: emails } })
+    .select('email status memberNumber claimed profilePic')
+    .lean();
+
+  // The photo itself rides along, not just a flag: the whole point of the screen
+  // is seeing that someone's avatar is a 200px Gomry thumbnail and replacing it.
+  // Affordable only because these lists are NY-hub applications inside a 30-day
+  // window — a handful of rows, not the 500-member roster.
+  return Object.fromEntries(profiles.map((p) => [p.email, {
+    id: String(p._id),
+    status: p.status,
+    memberNumber: p.memberNumber,
+    claimed: Boolean(p.claimed),
+    hasPhoto: Boolean(p.profilePic),
+    profilePic: p.profilePic || null,
+  }]));
+}
+
+/**
+ * GET|POST /api/community/gomry-admin — the Gomry application queue (admin only).
+ *
+ * Scoped to the New York hub on purpose. The Gomry organisation is shared by
+ * every ITC chapter — 162 submissions were pending across it when this was
+ * written and exactly one of them was ours — so listing the rest here would put
+ * Madrid's and San Francisco's applicants one click from a decision made by the
+ * wrong desk. Their counts show as a tally and nothing more.
+ *
+ * Its own action rather than part of /admin because these are three round-trips
+ * to an API that has taken 13 seconds to answer a single page, and the members
+ * dashboard should not wait on that to render.
+ *
+ * (Mirror of the /gomry-admin routes in server/routes/community.js.)
+ */
+async function handleGomryAdmin(req, res) {
+  if (!(await isAuthorized(req))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const decidedSince = new Date(Date.now() - DECISION_WINDOW_MS).toISOString();
+
+      // In parallel: Gomry is slow enough that doing these in series risks the
+      // serverless duration cap this function runs under.
+      const [allPending, accepted, rejected] = await Promise.all([
+        listApplications({ status: 'Pending' }),
+        nycApplications('Accepted', { submittedAfter: decidedSince }),
+        nycApplications('Rejected'),
+      ]);
+
+      const pending = allPending
+        .filter(isNycApplication)
+        .map(reviewFromApplication)
+        .sort((a, b) => new Date(b.submittedAt ?? 0) - new Date(a.submittedAt ?? 0));
+
+      const recent = [...accepted, ...rejected]
+        .sort((a, b) => new Date(b.submittedAt ?? 0) - new Date(a.submittedAt ?? 0));
+
+      const tally = new Map();
+      for (const application of allPending) {
+        const hub = String(reviewFromApplication(application).hub || '').trim();
+        if (hub === NYC_HUB) continue;
+        tally.set(hub || 'No hub given', (tally.get(hub || 'No hub given') || 0) + 1);
+      }
+
+      const members = await membersByEmail([...pending, ...recent]);
+
+      return res.status(200).json({
+        success: true,
+        hub: NYC_HUB,
+        pending,
+        recent,
+        members,
+        otherHubs: [...tally].map(([hub, count]) => ({ hub, count })).sort((a, b) => b.count - a.count),
+      });
+    } catch (error) {
+      console.error('❌ Gomry review fetch error:', error);
+      return res.status(502).json({ success: false, message: `Could not reach Gomry: ${error.message}` });
+    }
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
+  }
+
+  // Approve or reject one application. Gomry stays the source of truth: the
+  // verdict is written there first, and only a confirmed write turns into a
+  // member here. `notifyApplicant` is passed straight through and never
+  // defaulted, matching the guarantee the Gomry tool makes — nobody gets mailed
+  // because a field was left out.
+  try {
+    const { applicationId, decision, notifyApplicant } = req.body || {};
+
+    if (!applicationId) return res.status(400).json({ success: false, message: 'Missing applicationId.' });
+    if (!APPLICATION_STATUSES.includes(decision)) {
+      return res.status(400).json({ success: false, message: `decision must be one of ${APPLICATION_STATUSES.join(', ')}.` });
+    }
+    if (typeof notifyApplicant !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'notifyApplicant must be true or false.' });
+    }
+
+    let photo;
+    try {
+      photo = await resolveProfilePhoto(req.body);
+    } catch (photoError) {
+      return res.status(400).json({ success: false, message: photoError.message });
+    }
+
+    // Re-read the application rather than trusting the id the browser sent: the
+    // hub check below is the only thing keeping this desk off another chapter's
+    // queue, and it has to run against Gomry's copy.
+    const application = await getApplication(applicationId);
+    if (!application?.id) return res.status(404).json({ success: false, message: 'No such application on Gomry.' });
+    if (!isNycApplication(application)) {
+      return res.status(403).json({ success: false, message: 'That application is for another chapter — decide it in Gomry.' });
+    }
+
+    const moved = await setOneApplicationStatus(applicationId, decision, { notifyApplicant });
+    if (!moved.ok) {
+      return res.status(502).json({ success: false, message: `Gomry would not move that application: ${moved.reason}` });
+    }
+
+    if (decision !== 'Accepted') {
+      const mailed = notifyApplicant ? ' Applicant notified by Gomry.' : '';
+      return res.status(200).json({ success: true, message: `Marked ${decision} on Gomry.${mailed}` });
+    }
+
+    // Approval normally reaches us as a contact webhook, which is bursty and can
+    // lag; syncing inline means the member exists by the time this responds. A
+    // later delivery for the same contact is deduped on gomryContactId, so the
+    // two paths cannot both create a profile.
+    const synced = await syncMemberFromApplication({ ...application, status: 'Accepted' });
+    if (!synced) {
+      return res.status(200).json({ success: true, message: 'Accepted on Gomry, but no member profile could be created — the application has no email.' });
+    }
+
+    if (photo) {
+      await CommunityProfile.updateOne({ email: synced.email }, { $set: photoUpdate(photo) });
+    }
+
+    const created = synced.created ? 'Member profile created and welcomed.' : 'Member profile already existed.';
+    return res.status(200).json({ success: true, message: `Accepted on Gomry. ${created}${photo ? ' Photo saved.' : ''}` });
+  } catch (error) {
+    console.error('❌ Gomry decision error:', error);
+    // REST answers an unknown id with a 404, which restGet raises rather than
+    // returning — so the "no such application" case arrives here, not above.
+    if (/→ 404/.test(error.message)) {
+      return res.status(404).json({ success: false, message: 'No such application on Gomry.' });
+    }
+    // The status write is MCP-only, and those tokens get revoked without notice.
+    if (/Gomry MCP|GOMRY_MCP_TOKEN/.test(error.message)) {
+      return res.status(502).json({
+        success: false,
+        message: `Gomry rejected the write — the MCP token may have been revoked. (${error.message})`,
+      });
+    }
+    return res.status(502).json({ success: false, message: `Gomry call failed: ${error.message}` });
+  }
 }
 
 const GOMRY_WEBHOOK_CHANNELS = new Set(['application', 'contact']);
@@ -1466,9 +1688,17 @@ async function applyContactDelivery(payload, event) {
   if (!contactId || !lists.includes(APPROVED_LIST_ID)) return null;
 
   // Contact deliveries arrive in bursts — one list-add produced seven for the
-  // same person — so skip the REST round-trip for a contact already synced.
-  const known = await CommunityProfile.findOne({ gomryContactId: contactId }).select('_id').lean();
-  if (known) return null;
+  // same person — so skip the REST round-trip for a contact already synced. The
+  // one thing worth taking from a repeat delivery is `img`: an approval made in
+  // the admin panel creates the profile before Gomry has an avatar to send, so
+  // this is where that photo finally arrives.
+  const known = await CommunityProfile.findOne({ gomryContactId: contactId }).select('_id profilePic').lean();
+  if (known) {
+    if (!known.profilePic && typeof img === 'string' && img.startsWith('http')) {
+      await CommunityProfile.updateOne({ _id: known._id }, { $set: { profilePic: img } });
+    }
+    return null;
+  }
 
   const application = await acceptedApplicationForContact(contactId);
   if (!application) return null;
@@ -1503,6 +1733,7 @@ export default async function handler(req, res) {
       case 'card': return await handleCard(req, res);
       case 'claim-request': return await handleClaimRequest(req, res);
       case 'admin': return await handleAdmin(req, res);
+      case 'gomry-admin': return await handleGomryAdmin(req, res);
       case 'gomry-webhook': return await handleGomryWebhook(req, res);
       default: return res.status(404).json({ success: false, message: 'Not found' });
     }

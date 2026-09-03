@@ -8,6 +8,7 @@ import { fileToResizedDataUrl } from '../utils/image';
 import { describeCadence, expandOccurrences, formatShortDate, isRecurring, nextOccurrence } from '../lib/eventSchedule';
 import AdminInquiries from './AdminInquiries';
 import AdminCommunity from './AdminCommunity';
+import AdminGomry from './AdminGomry';
 import { getAdminSession, setAdminSession, clearAdminSession } from '../lib/adminSession';
 import { getMemberSession, clearMemberSession } from '../lib/memberSession';
 
@@ -1071,6 +1072,13 @@ const AdminEvents = () => {
     return <LoginGate error={loginError} />;
   }
 
+  const SUBTITLES = {
+    events: `${events.length} event${events.length === 1 ? '' : 's'} in the database`,
+    applications: 'Gomry membership applications for the New York chapter',
+    community: 'Approve new members and email-claim requests',
+    inquiries: 'Sponsorship inquiries sent from the website',
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -1078,11 +1086,7 @@ const AdminEvents = () => {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Admin Panel</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {tab === 'events'
-                ? `${events.length} event${events.length === 1 ? '' : 's'} in the database`
-                : tab === 'inquiries'
-                  ? 'Sponsorship inquiries sent from the website'
-                  : 'Approve new members and email-claim requests'}
+              {SUBTITLES[tab]}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1114,7 +1118,7 @@ const AdminEvents = () => {
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-900 w-fit mb-8">
-          {[['events', 'Events'], ['inquiries', 'Inquiries'], ['community', 'Community']].map(([key, label]) => (
+          {[['events', 'Events'], ['applications', 'Applications'], ['community', 'Community'], ['inquiries', 'Inquiries']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -1131,6 +1135,10 @@ const AdminEvents = () => {
 
         {tab === 'inquiries' && (
           <AdminInquiries authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
+        )}
+
+        {tab === 'applications' && (
+          <AdminGomry authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
         )}
 
         {tab === 'community' && (

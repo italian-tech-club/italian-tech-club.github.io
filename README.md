@@ -32,6 +32,9 @@ Events live in the `events` MongoDB collection and are managed from `/admin` (pa
 | `ADMIN_PASSWORD` | Vercel + local `.env` | Password for the `/admin` panel |
 | `VITE_API_URL` | `.env.production` | API base URL baked into the frontend build |
 | `PARTNER_VERIFY_KEY_<SLUG>` | Vercel + local `.env` | Per-partner secret its staff need to mark a one-time benefit code redeemed, e.g. `PARTNER_VERIFY_KEY_TIH`. Unset = `/verify` stays read-only for that partner. |
+| `GOMRY_API_KEY` | Vercel + local `.env` | Gomry REST. Reads applications and their answers — the only surface that returns an applicant's email. |
+| `GOMRY_MCP_TOKEN` | Vercel + local `.env` | Gomry MCP. The only surface that can *write*: approve/reject an application, and add a contact to the chapter list. |
+| `GOMRY_WEBHOOK_SECRET` | Vercel + local `.env` | Shared secret in the `?secret=` of the webhook URLs registered in Gomry. |
 
 ### Seeding / migration
 
@@ -40,6 +43,24 @@ To (re)seed the `events` collection from `src/data/events.json` (idempotent, ups
 ```bash
 npm run migrate:events
 ```
+
+## Membership applications (Gomry)
+
+Membership is decided on one Gomry form shared by every ITC chapter, and acceptance there — not a separate ITC review — is what makes someone a member. The `hub` answer says which chapter an application is for; `New York` is ours.
+
+The **Applications** tab in `/admin` is the New York desk for that queue:
+
+- Lists only `hub = New York` submissions. The rest of the org's pending applications (usually the large majority) show as a per-chapter tally and nothing more — the API refuses a decision on them.
+- **Approve** writes `Accepted` to Gomry first, then creates the ITC member profile from the application and sends the welcome/claim email. Gomry stays the source of truth; the profile always follows from it.
+- The **Send Gomry's acceptance / rejection email** checkbox maps to Gomry's `notify_applicant`. It is never defaulted server-side — on or off, the panel says which.
+- A decision made here and one made in the Gomry dashboard end up in the same place: acceptance adds the contact to "All Members (Approved)", which fires the contact webhook that also creates the member. The webhook dedupes on `gomryContactId`, so the two paths can't both create a profile.
+
+### Member photos
+
+Gomry stores a 200–300px avatar at best, and many members arrive with none. LinkedIn can't be read from a server (`www.linkedin.com` answers a scraper with HTTP 999, and its og:image is a small preview crop), so a person has to be looking at the page. Two ways to be that person:
+
+- In `/admin` — the photo frame on any application card, and the **Photo → fix** column on the Community tab's member table. Open their LinkedIn, then drag the photo onto the frame, or copy it and press ⌘V. A pasted image is downscaled in the browser; a dragged or pasted `media.licdn.com` URL is fetched server-side at the 800px render. Replacing a photo clears the member's pre-rendered share card so it re-renders.
+- In bulk — `npm run collect:pics`, which drives a real Chrome window through everyone missing a photo. Still the right tool for a whole backlog.
 
 ## Partners & member benefits
 
