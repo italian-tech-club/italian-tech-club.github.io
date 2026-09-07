@@ -8,6 +8,8 @@ import { ConnectRequest } from '../models/ConnectRequest.js';
 import { ProfileView } from '../models/ProfileView.js';
 import { nextSequence } from '../models/Counter.js';
 import GomryWebhookEvent from '../models/GomryWebhookEvent.js';
+import MarketingCampaign from '../models/MarketingCampaign.js';
+import Event from '../models/Event.js';
 import {
   profileFromApplication, isNycApplication, getApplication, addContactsToNycList,
   acceptedApplicationForContact, normalizeApplicationDelivery, normalizeContactDelivery, APPROVED_LIST_ID,
@@ -16,6 +18,10 @@ import {
 import { resolveProfilePhoto, photoUpdate } from '../utils/profilePhoto.js';
 import { sendMemberWelcome } from '../utils/memberWelcome.js';
 import { sendEmail, sendEmailBatch, magicLinkHtml, campaignHtml, fillTemplate, SITE_URL } from '../utils/email.js';
+import {
+  pickCampaignFields, audienceCounts, campaignFacts, renderForRecipient,
+  sendCampaign, sendCampaignTest, PREVIEW_RECIPIENT,
+} from '../utils/marketingCampaign.js';
 
 const router = express.Router();
 
@@ -57,6 +63,22 @@ async function findProfileByToken(token) {
     manageTokenHash: sha256(token),
     manageTokenExpiry: { $gt: new Date() },
   });
+}
+
+// Unsubscribe links are long-lived and land in inboxes, so the token is matched
+// as stored rather than hashed — losing one costs an opt-out, not an account.
+async function findByUnsubscribeToken(token) {
+  const value = String(token || '').trim();
+  if (!value || value === 'preview') return null;
+  return CommunityProfile.findOne({ unsubscribeToken: value });
+}
+
+// g*******@gmail.com — enough for the unsubscribe page to say which address it
+// is about, without printing the address to whoever opened the link.
+function maskEmail(email) {
+  const [user, domain] = String(email || '').split('@');
+  if (!user || !domain) return '';
+  return `${user[0]}${'*'.repeat(Math.max(user.length - 1, 3))}@${domain}`;
 }
 
 // Resolve the member session from the Authorization header. Only approved
@@ -1542,6 +1564,153 @@ router.post('/admin', requireAdmin, async (req, res) => {
     }
     return res.status(500).json({ success: false, message: 'Something went wrong. Please try again.' });
   }
+});
+
+/**
+ * GET /api/community/marketing — the Marketing tab's world: saved campaigns,
+ * how many people each audience is, who has opted out, and the events a
+ * campaign can borrow a poster from (admin only).
+ */
+router.get('/marketing', requireAdmin, async (req, res) => {
+  try {
+    const campaigns = await MarketingCampaign.find({})
+      .select('-recipients')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const audience = await audienceCounts(CommunityProfile);
+
+    const optedOut = await CommunityProfile.find({ marketingOptOut: true })
+      .select('firstName lastName email marketingOptOutAt')
+      .sort({ marketingOptOutAt: -1 })
+      .lean();
+
+    // Poster payloads are hundreds of KB apiece, so the picker reports only
+    // whether one exists — the campaign renderer links to it, never inlines it.
+    const events = await Event.aggregate([
+      {
+        $project: {
+          title: 1, date: 1, time: 1, location: 1, link: 1,
+          hasPoster: { $gt: [{ $strLenCP: { $ifNull: ['$poster', ''] } }, 0] },
+        },
+      },
+      { $sort: { date: -1 } },
+    ]);
+
+    return res.json({ success: true, campaigns, audience, optedOut, events });
+  } catch (error) {
+    console.error('❌ Marketing fetch error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to load marketing data' });
+  }
+});
+
+/**
+ * POST /api/community/marketing — save / delete / preview / test / send (admin only).
+ */
+router.post('/marketing', requireAdmin, async (req, res) => {
+  try {
+    const { action, campaignId } = req.body || {};
+
+    if (action === 'save') {
+      const data = pickCampaignFields(req.body.campaign || {});
+      if (!data.name?.trim() || !data.subject?.trim()) {
+        return res.status(400).json({ success: false, message: 'A campaign needs a name and a subject.' });
+      }
+      const campaign = campaignId
+        ? await MarketingCampaign.findByIdAndUpdate(campaignId, data, { new: true, runValidators: true })
+        : await MarketingCampaign.create(data);
+      if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+      return res.json({ success: true, campaign: campaign.toObject(), message: 'Saved.' });
+    }
+
+    if (action === 'delete') {
+      const campaign = await MarketingCampaign.findByIdAndDelete(campaignId);
+      if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+      return res.json({ success: true, message: 'Campaign deleted.' });
+    }
+
+    // Renders unsaved composer state, so the preview follows every keystroke
+    // without leaving half-written drafts behind.
+    if (action === 'preview') {
+      const campaign = pickCampaignFields(req.body.campaign || {});
+      const facts = await campaignFacts(campaign, Event, SITE_URL);
+      const { subject, html } = renderForRecipient({ campaign, facts, profile: PREVIEW_RECIPIENT, siteUrl: SITE_URL });
+      return res.json({ success: true, subject, html });
+    }
+
+    if (action === 'test' || action === 'send') {
+      const campaign = await MarketingCampaign.findById(campaignId);
+      if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+
+      if (action === 'test') {
+        const toEmail = String(req.body.toEmail || '').toLowerCase().trim();
+        if (!EMAIL_RE.test(toEmail)) {
+          return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+        }
+        const ok = await sendCampaignTest({ campaign, toEmail, CommunityProfile, Event, siteUrl: SITE_URL });
+        return res.json({
+          success: ok,
+          message: ok ? `Test sent to ${toEmail}.` : 'Send failed — check the email (Resend) configuration.',
+        });
+      }
+
+      const result = await sendCampaign({
+        campaign,
+        CommunityProfile,
+        Event,
+        siteUrl: SITE_URL,
+        skipAlreadySent: req.body.skipAlreadySent !== false,
+      });
+      return res.json({
+        success: true,
+        ...result,
+        message: `Sent ${result.sent} email${result.sent === 1 ? '' : 's'}`
+          + `${result.failed ? `, ${result.failed} failed` : ''}`
+          + `${result.skipped ? `, ${result.skipped} skipped (already received it)` : ''}.`,
+      });
+    }
+
+    return res.status(400).json({ success: false, message: 'Unknown action' });
+  } catch (error) {
+    console.error('❌ Marketing action error:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, message: 'Invalid id' });
+    }
+    return res.status(500).json({ success: false, message: 'Something went wrong. Please try again.' });
+  }
+});
+
+/**
+ * GET|POST /api/community/unsubscribe?u=<token> — public.
+ *
+ * GET reports where the address stands (so the page can say who it is about);
+ * POST flips the flag, and is what both the page's button and a mail client's
+ * one-click List-Unsubscribe call. A missing or unknown token is answered the
+ * same way as a valid one — this endpoint must never confirm whether an address
+ * is on the list to whoever is asking.
+ */
+router.get('/unsubscribe', async (req, res) => {
+  const profile = await findByUnsubscribeToken(req.query.u);
+  if (!profile) return res.json({ success: true, found: false });
+  return res.json({
+    success: true,
+    found: true,
+    email: maskEmail(profile.email),
+    firstName: profile.firstName,
+    optedOut: Boolean(profile.marketingOptOut),
+  });
+});
+
+router.post('/unsubscribe', async (req, res) => {
+  const profile = await findByUnsubscribeToken(req.query.u);
+  if (!profile) return res.json({ success: true, found: false });
+
+  const optOut = req.body?.resubscribe !== true;
+  profile.marketingOptOut = optOut;
+  profile.marketingOptOutAt = optOut ? new Date() : null;
+  await profile.save();
+
+  return res.json({ success: true, found: true, email: maskEmail(profile.email), optedOut: optOut });
 });
 
 export default router;

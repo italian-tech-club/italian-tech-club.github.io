@@ -1,6 +1,8 @@
 import express from 'express';
 import Event from '../models/Event.js';
 import { requireAdmin } from '../utils/adminAccess.js';
+import { sendEventPoster } from '../utils/eventPoster.js';
+import { SITE_URL } from '../utils/email.js';
 
 const router = express.Router();
 
@@ -23,11 +25,20 @@ function pickEventFields(body) {
 }
 
 /**
- * GET /api/events            — public list, newest first (gallery omitted, galleryCount added)
- * GET /api/events?id=<id>    — public single event with full gallery
+ * GET /api/events                          — public list, newest first (gallery omitted, galleryCount added)
+ * GET /api/events?id=<id>                  — public single event with full gallery
+ * GET /api/events?id=<id>&format=poster    — public: the poster as an image (see /e/<id>/poster.jpg)
  */
 router.get('/', async (req, res) => {
   try {
+    if (req.query.id && req.query.format === 'poster') {
+      const event = await Event.findById(req.query.id).select('poster').lean();
+      if (!event || !sendEventPoster(res, event.poster, SITE_URL)) {
+        return res.status(404).json({ success: false, message: 'No poster for this event' });
+      }
+      return;
+    }
+
     if (req.query.id) {
       const event = await Event.findById(req.query.id).lean();
       if (!event) {

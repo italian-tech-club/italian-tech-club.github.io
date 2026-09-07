@@ -11,6 +11,7 @@
   },
   "rewrites": [
     { "source": "/m/:slug/card.jpg", "destination": "/api/community/card?slug=:slug&format=jpg" },
+    { "source": "/e/:id/poster.jpg", "destination": "/api/events?id=:id&format=poster" },
     { "source": "/m/:slug", "destination": "/api/card/:slug" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

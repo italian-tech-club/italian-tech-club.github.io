@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+// Pure response writing — no mongoose, so it cannot collide with this file's
+// own model registrations.
+import { sendEventPoster } from '../server/utils/eventPoster.js';
 
 // MongoDB connection caching for serverless
 let cachedConnection = null;
@@ -73,6 +76,8 @@ eventSchema.index({ date: 1, title: 1 }, { unique: true });
 const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
 
 const EVENT_FIELDS = ['date', 'title', 'subtitle', 'location', 'time', 'type', 'link', 'poster', 'gallery', 'recurrence', 'series'];
+
+const SITE_URL = process.env.SITE_URL || 'https://italiantechclubnyc.com';
 
 // Admin sessions created by /api/admin/auth (magic-link login)
 const adminSessionSchema = new mongoose.Schema({
@@ -160,6 +165,17 @@ export default async function handler(req, res) {
     // payload) and exposes galleryCount instead; galleries are fetched
     // per-event on demand.
     if (req.method === 'GET') {
+      // ?format=poster streams the stored poster as an image. Rewritten to the
+      // tidy /e/<id>/poster.jpg in vercel.json — that is the URL marketing mail
+      // points at, since email clients refuse the base64 data URL we store.
+      if (req.query.id && req.query.format === 'poster') {
+        const event = await Event.findById(req.query.id).select('poster').lean();
+        if (!event || !sendEventPoster(res, event.poster, SITE_URL)) {
+          return res.status(404).json({ success: false, message: 'No poster for this event' });
+        }
+        return;
+      }
+
       if (req.query.id) {
         const event = await Event.findById(req.query.id).lean();
         if (!event) {

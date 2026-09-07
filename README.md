@@ -76,6 +76,27 @@ Partner identity and perk mechanics are deliberately on separate pages, so the p
 - Codes are `ITC-<PARTNER>-XXXX-XXXX`, issued once per member per benefit (idempotent) and stored in the `benefit_claims` collection. Never rename a benefit id — codes in circulation reference it. Retire a benefit with `active: false` instead.
 - A code stops verifying the moment the member's profile leaves `approved` status, so lapsed members lose the discount without anyone telling the partner.
 
+## Marketing email
+
+The **Marketing** tab in `/admin` is the only place the club sends broadcast mail from — event invitations and announcements, as opposed to the transactional mail (sign-in links, connect requests, welcome emails) the rest of the app sends to one person who asked for it.
+
+- A campaign lives in the `marketing_campaigns` collection and is composed in the panel: subject, preheader, body, sign-off, an optional promo-code block, and a button. The body takes blank lines as paragraphs and understands `**bold**`, `_italic_`, `[label](url)` and the `{{firstName}}` / `{{lastName}}` placeholders.
+- Attaching an **event** pulls that event's poster, date, time and venue into the layout, so the copy never repeats facts already in the `events` collection.
+- The preview under the composer renders through the same function the send does, with *Mario Rossi* standing in for the recipient — what you approve is what ships.
+- **Send test** mails one copy to any address (recording nothing); **Send to N** mails the audience. Anyone who already received that campaign is skipped, so a second send tops up a list that has grown rather than mailing everyone twice.
+- Audiences are everyone / claimed / not-yet-claimed / approved. Two exclusions apply to all of them and are not selectable: members who opted out, and `inactive` profiles.
+
+### Unsubscribe
+
+Every campaign carries an opt-out — in the footer, and in the `List-Unsubscribe` / `List-Unsubscribe-Post` headers Gmail and Apple Mail surface as their own button.
+
+- The link is `/unsubscribe?u=<token>`, where the token is a per-member secret minted on the first campaign that includes them (`unsubscribeToken`). Opening the page opts them out immediately and offers an undo — the opt-out runs as a POST from the page's JS, so the link-scanners that prefetch every URL in an email can't unsubscribe anyone by accident.
+- Opting out sets `marketingOptOut` and only stops marketing. The person stays a member in good standing and still gets their sign-in links and connect requests.
+
+### Posters in email
+
+Posters are stored as base64 data URLs, which browsers render inline and email clients drop on the floor. `GET /e/<id>/poster.jpg` (rewritten to `/api/events?id=<id>&format=poster`) serves one as a real image at a real URL, which is what campaign HTML points at. An event whose poster is a repo path or external URL redirects there instead.
+
 ### Notes
 
 - Poster and gallery images can be uploaded directly in the admin panel — they are downscaled client-side and stored in MongoDB as base64 data URLs. Repo paths (`/images/events/...`) and external URLs also still work.

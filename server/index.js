@@ -27,6 +27,15 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/partners', partnersRoutes);
 
+// The pretty poster URL marketing email points at. Rewritten in vercel.json in
+// production; declared here so a locally-pointed SITE_URL resolves the same way.
+app.get('/e/:id/poster.jpg', (req, res, next) => {
+  // The events router matches on req.url, so hand it the path it expects —
+  // req.query is derived from req.url and follows.
+  req.url = `/?id=${encodeURIComponent(req.params.id)}&format=poster`;
+  eventsRoutes(req, res, next);
+});
+
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

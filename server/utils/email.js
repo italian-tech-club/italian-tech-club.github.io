@@ -22,7 +22,7 @@ export const BCC_EMAILS = (process.env.MEMBER_EMAIL_BCC || '')
  * Pass `bcc: BCC_EMAILS` to copy the configured admin addresses — see the
  * warning on that constant before doing so.
  */
-export async function sendEmail({ to, subject, html, replyTo, bcc = [] }) {
+export async function sendEmail({ to, subject, html, replyTo, bcc = [], headers }) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('⚠️ RESEND_API_KEY not set — email not sent:', subject);
     return false;
@@ -41,6 +41,7 @@ export async function sendEmail({ to, subject, html, replyTo, bcc = [] }) {
       html,
       ...(replyTo ? { reply_to: replyTo } : {}),
       ...(bcc?.length ? { bcc } : {}),
+      ...(headers ? { headers } : {}),
     }),
   });
 
@@ -107,6 +108,7 @@ export async function sendEmailBatch(messages) {
     html: m.html,
     ...(m.replyTo ? { reply_to: m.replyTo } : {}),
     ...(m.bcc?.length ? { bcc: m.bcc } : {}),
+    ...(m.headers ? { headers: m.headers } : {}),
   }));
 
   try {

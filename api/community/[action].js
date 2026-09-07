@@ -19,6 +19,10 @@ import {
 } from '../../server/utils/gomry.js';
 import { resolveProfilePhoto, photoUpdate } from '../../server/utils/profilePhoto.js';
 import { sendMemberWelcome } from '../../server/utils/memberWelcome.js';
+import {
+  pickCampaignFields, audienceCounts, campaignFacts, renderForRecipient,
+  sendCampaign, sendCampaignTest, PREVIEW_RECIPIENT,
+} from '../../server/utils/marketingCampaign.js';
 
 /**
  * Consolidated community API. Vercel Hobby caps a deployment at 12 serverless
@@ -31,7 +35,9 @@ import { sendMemberWelcome } from '../../server/utils/memberWelcome.js';
  *   POST   /api/community/view              (profile view tracking, member only)
  *   GET    /api/community/card              (public: shareable member card)
  *   POST   /api/community/claim-request
+ *   GET|POST /api/community/unsubscribe     (public; per-member token in ?u=)
  *   GET|POST /api/community/admin           (admin session required)
+ *   GET|POST /api/community/marketing       (admin session required; broadcast campaigns)
  *   GET|POST /api/community/gomry-admin     (admin session required; Gomry application queue)
  *   POST   /api/community/gomry-webhook     (Gomry deliveries; shared secret in ?secret=)
  * The segment after /community/ arrives as req.query.action.
@@ -89,6 +95,11 @@ const communityProfileSchema = new mongoose.Schema({
   lastClaimEmailAt: { type: Date, default: null },
   claimEmailCount: { type: Number, default: 0 },
   gdprConsent: { type: Boolean, default: false },
+  marketingOptOut: { type: Boolean, default: false },
+  marketingOptOutAt: { type: Date, default: null },
+  unsubscribeToken: { type: String, default: null },
+  lastMarketingEmailAt: { type: Date, default: null },
+  marketingEmailCount: { type: Number, default: 0 },
   gomryApplicationId: { type: String, default: null },
   gomryContactId: { type: String, default: null },
   manageTokenHash: { type: String, default: null },
@@ -104,6 +115,7 @@ communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterE
 communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
 communityProfileSchema.index({ cardSlug: 1 }, { unique: true, partialFilterExpression: { cardSlug: { $type: 'string' } } });
 communityProfileSchema.index({ gomryApplicationId: 1 }, { unique: true, partialFilterExpression: { gomryApplicationId: { $type: 'string' } } });
+communityProfileSchema.index({ unsubscribeToken: 1 }, { unique: true, partialFilterExpression: { unsubscribeToken: { $type: 'string' } } });
 
 const emailClaimRequestSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
@@ -188,7 +200,53 @@ const gomryWebhookEventSchema = new mongoose.Schema({
 });
 gomryWebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
+// Marketing campaigns (must match server/models/MarketingCampaign.js).
+const marketingCampaignSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true, maxlength: 120 },
+  subject: { type: String, required: true, trim: true, maxlength: 200 },
+  preheader: { type: String, trim: true, maxlength: 200, default: '' },
+  eyebrow: { type: String, trim: true, maxlength: 60, default: '' },
+  headline: { type: String, trim: true, maxlength: 140, default: '' },
+  body: { type: String, default: '' },
+  signoff: { type: String, maxlength: 300, default: '' },
+  ctaLabel: { type: String, trim: true, maxlength: 60, default: '' },
+  ctaUrl: { type: String, trim: true, maxlength: 500, default: '' },
+  eventId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  promoTitle: { type: String, trim: true, maxlength: 80, default: '' },
+  promoCode: { type: String, trim: true, maxlength: 60, default: '' },
+  promoNote: { type: String, trim: true, maxlength: 200, default: '' },
+  audience: { type: String, enum: ['all', 'claimed', 'unclaimed', 'approved'], default: 'all' },
+  status: { type: String, enum: ['draft', 'sent'], default: 'draft' },
+  lastSentAt: { type: Date, default: null },
+  sentCount: { type: Number, default: 0 },
+  failedCount: { type: Number, default: 0 },
+  recipients: {
+    type: [new mongoose.Schema({
+      profileId: { type: mongoose.Schema.Types.ObjectId, required: true },
+      email: { type: String, required: true, lowercase: true },
+      sentAt: { type: Date, default: Date.now },
+    }, { _id: false })],
+    default: [],
+  },
+}, {
+  timestamps: true,
+  collection: 'marketing_campaigns',
+});
+
+// Read-only mirror of server/models/Event.js: a campaign borrows an event's
+// poster and facts, and never writes one back.
+const marketingEventSchema = new mongoose.Schema({
+  title: String,
+  date: String,
+  time: String,
+  location: String,
+  link: String,
+  poster: String,
+}, { collection: 'events', strict: false });
+
 const CommunityProfile = mongoose.models.CommunityProfile || mongoose.model('CommunityProfile', communityProfileSchema);
+const MarketingCampaign = mongoose.models.MarketingCampaign || mongoose.model('MarketingCampaign', marketingCampaignSchema);
+const Event = mongoose.models.Event || mongoose.model('Event', marketingEventSchema);
 const EmailClaimRequest = mongoose.models.EmailClaimRequest || mongoose.model('EmailClaimRequest', emailClaimRequestSchema);
 const AdminSession = mongoose.models.AdminSession || mongoose.model('AdminSession', adminSessionSchema);
 const MemberSession = mongoose.models.MemberSession || mongoose.model('MemberSession', memberSessionSchema);
@@ -337,6 +395,22 @@ async function findProfileByToken(token) {
     manageTokenHash: sha256(token),
     manageTokenExpiry: { $gt: new Date() },
   });
+}
+
+// Unsubscribe links are long-lived and land in inboxes, so the token is matched
+// as stored rather than hashed — losing one costs an opt-out, not an account.
+async function findByUnsubscribeToken(token) {
+  const value = String(token || '').trim();
+  if (!value || value === 'preview') return null;
+  return CommunityProfile.findOne({ unsubscribeToken: value });
+}
+
+// g*******@gmail.com — enough for the unsubscribe page to say which address it
+// is about, without printing the address to whoever opened the link.
+function maskEmail(email) {
+  const [user, domain] = String(email || '').split('@');
+  if (!user || !domain) return '';
+  return `${user[0]}${'*'.repeat(Math.max(user.length - 1, 3))}@${domain}`;
 }
 
 // Verify + claim a profile accessed via a valid magic link. Seeded-but-
@@ -1345,6 +1419,144 @@ async function handleAdmin(req, res) {
   return res.status(405).json({ success: false, message: 'Method not allowed' });
 }
 
+// ---- GET|POST /api/community/marketing (admin session required) ----
+// Saved campaigns, audience sizes, the opt-out list, and the events a campaign
+// can borrow a poster from. (Mirror of the /marketing routes in server/routes.)
+async function handleMarketing(req, res) {
+  if (!(await isAuthorized(req))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  if (req.method === 'GET') {
+    const campaigns = await MarketingCampaign.find({})
+      .select('-recipients')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const audience = await audienceCounts(CommunityProfile);
+
+    const optedOut = await CommunityProfile.find({ marketingOptOut: true })
+      .select('firstName lastName email marketingOptOutAt')
+      .sort({ marketingOptOutAt: -1 })
+      .lean();
+
+    // Poster payloads are hundreds of KB apiece, so the picker reports only
+    // whether one exists — the campaign renderer links to it, never inlines it.
+    const events = await Event.aggregate([
+      {
+        $project: {
+          title: 1, date: 1, time: 1, location: 1, link: 1,
+          hasPoster: { $gt: [{ $strLenCP: { $ifNull: ['$poster', ''] } }, 0] },
+        },
+      },
+      { $sort: { date: -1 } },
+    ]);
+
+    return res.status(200).json({ success: true, campaigns, audience, optedOut, events });
+  }
+
+  if (req.method === 'POST') {
+    const { action, campaignId } = req.body || {};
+
+    if (action === 'save') {
+      const data = pickCampaignFields(req.body.campaign || {});
+      if (!data.name?.trim() || !data.subject?.trim()) {
+        return res.status(400).json({ success: false, message: 'A campaign needs a name and a subject.' });
+      }
+      const campaign = campaignId
+        ? await MarketingCampaign.findByIdAndUpdate(campaignId, data, { new: true, runValidators: true })
+        : await MarketingCampaign.create(data);
+      if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+      return res.status(200).json({ success: true, campaign: campaign.toObject(), message: 'Saved.' });
+    }
+
+    if (action === 'delete') {
+      const campaign = await MarketingCampaign.findByIdAndDelete(campaignId);
+      if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+      return res.status(200).json({ success: true, message: 'Campaign deleted.' });
+    }
+
+    // Renders unsaved composer state, so the preview follows every keystroke
+    // without leaving half-written drafts behind.
+    if (action === 'preview') {
+      const campaign = pickCampaignFields(req.body.campaign || {});
+      const facts = await campaignFacts(campaign, Event, SITE_URL);
+      const { subject, html } = renderForRecipient({ campaign, facts, profile: PREVIEW_RECIPIENT, siteUrl: SITE_URL });
+      return res.status(200).json({ success: true, subject, html });
+    }
+
+    if (action === 'test' || action === 'send') {
+      const campaign = await MarketingCampaign.findById(campaignId);
+      if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+
+      if (action === 'test') {
+        const toEmail = String(req.body.toEmail || '').toLowerCase().trim();
+        if (!EMAIL_RE.test(toEmail)) {
+          return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+        }
+        const ok = await sendCampaignTest({ campaign, toEmail, CommunityProfile, Event, siteUrl: SITE_URL });
+        return res.status(200).json({
+          success: ok,
+          message: ok ? `Test sent to ${toEmail}.` : 'Send failed — check the email (Resend) configuration.',
+        });
+      }
+
+      const result = await sendCampaign({
+        campaign,
+        CommunityProfile,
+        Event,
+        siteUrl: SITE_URL,
+        skipAlreadySent: req.body.skipAlreadySent !== false,
+      });
+      return res.status(200).json({
+        success: true,
+        ...result,
+        message: `Sent ${result.sent} email${result.sent === 1 ? '' : 's'}`
+          + `${result.failed ? `, ${result.failed} failed` : ''}`
+          + `${result.skipped ? `, ${result.skipped} skipped (already received it)` : ''}.`,
+      });
+    }
+
+    return res.status(400).json({ success: false, message: 'Unknown action' });
+  }
+
+  return res.status(405).json({ success: false, message: 'Method not allowed' });
+}
+
+// ---- GET|POST /api/community/unsubscribe?u=<token> (public) ----
+// GET reports where the address stands (so the page can say who it is about);
+// POST flips the flag, and is what both the page's button and a mail client's
+// one-click List-Unsubscribe call. A missing or unknown token is answered the
+// same way as a valid one — this endpoint must never confirm whether an address
+// is on the list to whoever is asking.
+async function handleUnsubscribe(req, res) {
+  const profile = await findByUnsubscribeToken(req.query.u);
+
+  if (req.method === 'GET') {
+    if (!profile) return res.status(200).json({ success: true, found: false });
+    return res.status(200).json({
+      success: true,
+      found: true,
+      email: maskEmail(profile.email),
+      firstName: profile.firstName,
+      optedOut: Boolean(profile.marketingOptOut),
+    });
+  }
+
+  if (req.method === 'POST') {
+    if (!profile) return res.status(200).json({ success: true, found: false });
+
+    const optOut = req.body?.resubscribe !== true;
+    profile.marketingOptOut = optOut;
+    profile.marketingOptOutAt = optOut ? new Date() : null;
+    await profile.save();
+
+    return res.status(200).json({ success: true, found: true, email: maskEmail(profile.email), optedOut: optOut });
+  }
+
+  return res.status(405).json({ success: false, message: 'Method not allowed' });
+}
+
 // How far back the review screen looks for already-decided applications. Long
 // enough to undo last week's mistake or fix a new member's photo, short enough
 // that the Accepted query stays one page of a 500-row collection.
@@ -1733,6 +1945,8 @@ export default async function handler(req, res) {
       case 'card': return await handleCard(req, res);
       case 'claim-request': return await handleClaimRequest(req, res);
       case 'admin': return await handleAdmin(req, res);
+      case 'marketing': return await handleMarketing(req, res);
+      case 'unsubscribe': return await handleUnsubscribe(req, res);
       case 'gomry-admin': return await handleGomryAdmin(req, res);
       case 'gomry-webhook': return await handleGomryWebhook(req, res);
       default: return res.status(404).json({ success: false, message: 'Not found' });

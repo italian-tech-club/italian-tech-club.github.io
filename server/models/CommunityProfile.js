@@ -160,6 +160,32 @@ const communityProfileSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // Marketing opt-out. Separate from `status` on purpose: someone who never
+  // wants another announcement is still a member in good standing, and still
+  // gets the transactional mail (sign-in links, connect requests) they asked for.
+  marketingOptOut: {
+    type: Boolean,
+    default: false,
+  },
+  marketingOptOutAt: {
+    type: Date,
+    default: null,
+  },
+  // Stable per-member secret behind the unsubscribe link, minted on the first
+  // campaign that includes them. Not derived from the id: an opt-out link that
+  // can be guessed from a public member number is one anyone could fire.
+  unsubscribeToken: {
+    type: String,
+    default: null,
+  },
+  lastMarketingEmailAt: {
+    type: Date,
+    default: null,
+  },
+  marketingEmailCount: {
+    type: Number,
+    default: 0,
+  },
   // Provenance for members created by the Gomry sync (approval on the
   // application form). Unique so a redelivered webhook or a re-run of the
   // backfill can't create a second profile for the same submission.
@@ -206,6 +232,7 @@ communityProfileSchema.index({ memberNumber: 1 }, { unique: true, partialFilterE
 communityProfileSchema.index({ inviteCode: 1 }, { unique: true, partialFilterExpression: { inviteCode: { $type: 'string' } } });
 communityProfileSchema.index({ cardSlug: 1 }, { unique: true, partialFilterExpression: { cardSlug: { $type: 'string' } } });
 communityProfileSchema.index({ gomryApplicationId: 1 }, { unique: true, partialFilterExpression: { gomryApplicationId: { $type: 'string' } } });
+communityProfileSchema.index({ unsubscribeToken: 1 }, { unique: true, partialFilterExpression: { unsubscribeToken: { $type: 'string' } } });
 
 const CommunityProfile = mongoose.model('CommunityProfile', communityProfileSchema);
 

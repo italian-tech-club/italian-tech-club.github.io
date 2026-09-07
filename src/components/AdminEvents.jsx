@@ -9,6 +9,7 @@ import { describeCadence, expandOccurrences, formatShortDate, isRecurring, nextO
 import AdminInquiries from './AdminInquiries';
 import AdminCommunity from './AdminCommunity';
 import AdminGomry from './AdminGomry';
+import AdminMarketing from './AdminMarketing';
 import { getAdminSession, setAdminSession, clearAdminSession } from '../lib/adminSession';
 import { getMemberSession, clearMemberSession } from '../lib/memberSession';
 
@@ -1076,6 +1077,7 @@ const AdminEvents = () => {
     events: `${events.length} event${events.length === 1 ? '' : 's'} in the database`,
     applications: 'Gomry membership applications for the New York chapter',
     community: 'Approve new members and email-claim requests',
+    marketing: 'Broadcast email to the contact list — campaigns, audiences and opt-outs',
     inquiries: 'Sponsorship inquiries sent from the website',
   };
 
@@ -1118,7 +1120,7 @@ const AdminEvents = () => {
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-900 w-fit mb-8">
-          {[['events', 'Events'], ['applications', 'Applications'], ['community', 'Community'], ['inquiries', 'Inquiries']].map(([key, label]) => (
+          {[['events', 'Events'], ['applications', 'Applications'], ['community', 'Community'], ['marketing', 'Marketing'], ['inquiries', 'Inquiries']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -1143,6 +1145,10 @@ const AdminEvents = () => {
 
         {tab === 'community' && (
           <AdminCommunity authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
+        )}
+
+        {tab === 'marketing' && (
+          <AdminMarketing authHeaders={authHeaders} onUnauthorized={handleUnauthorized} />
         )}
 
         {tab === 'events' && loading && (

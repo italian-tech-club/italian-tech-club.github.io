@@ -34,6 +34,7 @@ import BenefitVerify from './components/BenefitVerify';
 import Ecosystem from './components/Ecosystem';
 import EcosystemAbout from './components/EcosystemAbout';
 import I4Page from './components/I4Page';
+import Unsubscribe from './components/Unsubscribe';
 
 // Homepage component with all sections.
 const HomePage = () => {
@@ -95,6 +96,8 @@ function App() {
       <Route path="/partners" element={<Partners />} />
       <Route path="/partners/:slug" element={<PartnerDetail />} />
       <Route path="/verify" element={<BenefitVerify />} />
+      {/* Opt-out target of every marketing email. */}
+      <Route path="/unsubscribe" element={<Unsubscribe />} />
       {/* Unlisted on purpose: reachable by URL, absent from nav and homepage. */}
       <Route path="/ecosystem" element={<Ecosystem />} />
       <Route path="/ecosystem/about" element={<EcosystemAbout />} />
