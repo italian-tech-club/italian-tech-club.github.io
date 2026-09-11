@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import { sendEmail, sendEmailBatch, SITE_URL } from './email.js';
 import { renderMarketingEmail, eventFacts } from './marketingEmail.js';
+import { campaignCtaUrl, gomryEventId, lumaEventUrl } from './marketingAnalytics.js';
 
 const BATCH_SIZE = 100; // Resend batch endpoint hard limit
 
@@ -21,7 +22,7 @@ export const PREVIEW_RECIPIENT = { firstName: 'Mario', lastName: 'Rossi', unsubs
 // recipients) is written by a send, never by a save.
 export const CAMPAIGN_FIELDS = [
   'name', 'subject', 'preheader', 'eyebrow', 'headline', 'body', 'signoff',
-  'ctaLabel', 'ctaUrl', 'eventId', 'promoTitle', 'promoCode', 'promoNote', 'audience',
+  'ctaLabel', 'ctaUrl', 'eventId', 'promoTitle', 'promoCode', 'promoNote', 'audience', 'conversionGoal',
 ];
 
 const chunk = (arr, size) => {
@@ -30,13 +31,23 @@ const chunk = (arr, size) => {
   return out;
 };
 
-export function pickCampaignFields(body = {}) {
+export function pickCampaignFields(body = {}, { validateGoal = false } = {}) {
   const data = {};
   for (const field of CAMPAIGN_FIELDS) {
     if (body[field] !== undefined) data[field] = body[field];
   }
   // An empty select is "no event", not a cast error on ''.
   if (data.eventId !== undefined && !data.eventId) data.eventId = null;
+  if (data.ctaUrl) {
+    // Validate before saving as well as before sending. Do not allow executable
+    // URLs in either previews or tracked links.
+    campaignCtaUrl(data.ctaUrl, 'validation', 'validation');
+  }
+  if (validateGoal && data.conversionGoal === 'registration' && !gomryEventId(data.ctaUrl) && !lumaEventUrl(data.ctaUrl)) {
+    const error = new Error('Event registration tracking needs a Gomry or Luma event URL as the button link.');
+    error.status = 400;
+    throw error;
+  }
   return data;
 }
 
@@ -71,7 +82,7 @@ export async function audienceCounts(CommunityProfile) {
   return { all, claimed, unclaimed, approved, optedOut };
 }
 
-export const unsubscribeUrl = (token, siteUrl = SITE_URL) => `${siteUrl}/unsubscribe?u=${token}`;
+export const unsubscribeUrl = (token, siteUrl = SITE_URL, deliveryId) => `${siteUrl}/unsubscribe?u=${token}${deliveryId ? `&d=${deliveryId}` : ''}`;
 
 /**
  * Give every one of these profiles an unsubscribe token, minting the missing
@@ -105,14 +116,19 @@ export async function campaignFacts(campaign, Event, siteUrl = SITE_URL) {
  * Exactly what one person receives. The preview, the test send and the real
  * send all go through here, so what an admin approves is what ships.
  */
-export function renderForRecipient({ campaign, facts, profile, siteUrl = SITE_URL }) {
-  return renderMarketingEmail({
+export function renderForRecipient({ campaign, facts, profile, siteUrl = SITE_URL, deliveryId }) {
+  const rendered = renderMarketingEmail({
     campaign,
     facts,
     recipient: { firstName: profile.firstName, lastName: profile.lastName },
-    unsubscribeUrl: unsubscribeUrl(profile.unsubscribeToken || 'preview', siteUrl),
+    unsubscribeUrl: unsubscribeUrl(profile.unsubscribeToken || 'preview', siteUrl, deliveryId),
     siteUrl,
   });
+  // Mail clients POST the List-Unsubscribe URL directly; it must be an API,
+  // while the footer opens the human-facing page (which also offers undo).
+  const apiUrl = (process.env.MARKETING_API_URL || siteUrl).replace(/\/$/, '');
+  rendered.headers['List-Unsubscribe'] = `<${apiUrl}/api/community/unsubscribe?u=${profile.unsubscribeToken || 'preview'}${deliveryId ? `&d=${deliveryId}` : ''}>`;
+  return rendered;
 }
 
 /**
@@ -121,7 +137,7 @@ export function renderForRecipient({ campaign, facts, profile, siteUrl = SITE_UR
  * `skipAlreadySent` is the default because the ordinary second send is a top-up
  * of a list that grew since the first, not a re-mail of everyone.
  */
-export async function sendCampaign({ campaign, CommunityProfile, Event, siteUrl = SITE_URL, skipAlreadySent = true }) {
+export async function sendCampaign({ campaign, CommunityProfile, Event, Delivery, siteUrl = SITE_URL, skipAlreadySent = true }) {
   const already = new Set((campaign.recipients || []).map((r) => String(r.profileId)));
   const audience = await CommunityProfile.find(audienceFilter(campaign.audience))
     .select('firstName lastName email unsubscribeToken');
@@ -137,15 +153,46 @@ export async function sendCampaign({ campaign, CommunityProfile, Event, siteUrl 
   await ensureUnsubscribeTokens(profiles, CommunityProfile);
   const facts = await campaignFacts(campaign, Event, siteUrl);
 
-  const messages = profiles.map((profile) => {
-    const { subject, html, headers } = renderForRecipient({ campaign, facts, profile, siteUrl });
-    return { to: profile.email, subject, html, headers };
+  const deliveries = profiles.map((profile) => {
+    const id = crypto.randomBytes(16).toString('hex');
+    return {
+      _id: id, campaignId: campaign._id, profileId: profile._id,
+      email: profile.email, name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
+      ctaUrl: campaignCtaUrl(campaign.ctaUrl, campaign._id, id),
+      conversionGoal: campaign.conversionGoal || 'none',
+      gomryEventId: gomryEventId(campaign.ctaUrl),
+      lumaEventUrl: lumaEventUrl(campaign.ctaUrl),
+    };
+  });
+  // Persist before contacting Resend: a delivery/open callback can beat the
+  // batch response. Tags correlate it without guessing from email/subject.
+  await Delivery.insertMany(deliveries);
+
+  const messages = profiles.map((profile, i) => {
+    const delivery = deliveries[i];
+    const { subject, html, headers } = renderForRecipient({
+      campaign: { ...campaign.toObject(), ctaUrl: delivery.ctaUrl }, facts, profile, siteUrl, deliveryId: delivery._id,
+    });
+    return { to: profile.email, subject, html, headers, tags: [
+      { name: 'itc_campaign', value: String(campaign._id) },
+      { name: 'itc_delivery', value: delivery._id },
+    ] };
   });
 
   const sentOk = new Set();
+  let offset = 0;
   for (const group of chunk(messages, BATCH_SIZE)) {
     const { results } = await sendEmailBatch(group);
     for (const result of results) if (result.ok) sentOk.add(result.to);
+    const at = new Date();
+    await Delivery.bulkWrite(results.map((result, i) => ({ updateOne: {
+      filter: { _id: deliveries[offset + i]._id },
+      update: {
+        $min: result.ok ? { acceptedAt: at } : { failedAt: at },
+        ...(result.id ? { $set: { resendId: result.id } } : {}),
+      },
+    } })));
+    offset += group.length;
   }
 
   const now = new Date();

@@ -9,6 +9,8 @@ import { ProfileView } from '../models/ProfileView.js';
 import { nextSequence } from '../models/Counter.js';
 import GomryWebhookEvent from '../models/GomryWebhookEvent.js';
 import MarketingCampaign from '../models/MarketingCampaign.js';
+import MarketingDelivery from '../models/MarketingDelivery.js';
+import { recordConversion, recordCampaignUnsubscribe } from '../utils/marketingAnalytics.js';
 import Event from '../models/Event.js';
 import {
   profileFromApplication, isNycApplication, getApplication, addContactsToNycList,
@@ -203,15 +205,22 @@ const memberSummary = (profile) => ({
 // records consent and publishes it. New self-submissions ('pending') stay
 // pending until an admin approves.
 async function applyClaim(profile) {
+  const firstClaim = !profile.claimed;
   let changed = false;
   if (!profile.emailVerified) { profile.emailVerified = true; changed = true; }
-  if (!profile.claimed) { profile.claimed = true; changed = true; }
+  if (!profile.claimed) { profile.claimed = true; profile.claimedAt = new Date(); changed = true; }
   if (profile.status === 'unclaimed') {
     profile.status = 'approved';
     profile.gdprConsent = true;
     changed = true;
   }
   if (changed) await profile.save();
+  if (firstClaim) {
+    await recordConversion({ Delivery: MarketingDelivery, profileId: profile._id, goal: 'profile_claim',
+      occurredAt: profile.claimedAt, source: 'profile_claim', reference: `claim:${profile._id}` }).catch((error) => {
+      console.error('Marketing claim attribution failed:', error.message);
+    });
+  }
 }
 
 /**
@@ -1612,7 +1621,7 @@ router.post('/marketing', requireAdmin, async (req, res) => {
     const { action, campaignId } = req.body || {};
 
     if (action === 'save') {
-      const data = pickCampaignFields(req.body.campaign || {});
+      const data = pickCampaignFields(req.body.campaign || {}, { validateGoal: true });
       if (!data.name?.trim() || !data.subject?.trim()) {
         return res.status(400).json({ success: false, message: 'A campaign needs a name and a subject.' });
       }
@@ -1626,6 +1635,7 @@ router.post('/marketing', requireAdmin, async (req, res) => {
     if (action === 'delete') {
       const campaign = await MarketingCampaign.findByIdAndDelete(campaignId);
       if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+      await MarketingDelivery.deleteMany({ campaignId });
       return res.json({ success: true, message: 'Campaign deleted.' });
     }
 
@@ -1658,6 +1668,7 @@ router.post('/marketing', requireAdmin, async (req, res) => {
         campaign,
         CommunityProfile,
         Event,
+        Delivery: MarketingDelivery,
         siteUrl: SITE_URL,
         skipAlreadySent: req.body.skipAlreadySent !== false,
       });
@@ -1673,6 +1684,7 @@ router.post('/marketing', requireAdmin, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Unknown action' });
   } catch (error) {
     console.error('❌ Marketing action error:', error);
+    if (error.status === 400) return res.status(400).json({ success: false, message: error.message });
     if (error.name === 'CastError') {
       return res.status(400).json({ success: false, message: 'Invalid id' });
     }
@@ -1709,6 +1721,7 @@ router.post('/unsubscribe', async (req, res) => {
   profile.marketingOptOut = optOut;
   profile.marketingOptOutAt = optOut ? new Date() : null;
   await profile.save();
+  await recordCampaignUnsubscribe({ Delivery: MarketingDelivery, profileId: profile._id, deliveryId: req.query.d, optOut });
 
   return res.json({ success: true, found: true, email: maskEmail(profile.email), optedOut: optOut });
 });

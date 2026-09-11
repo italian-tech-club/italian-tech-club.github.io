@@ -86,6 +86,14 @@ The **Marketing** tab in `/admin` is the only place the club sends broadcast mai
 - **Send test** mails one copy to any address (recording nothing); **Send to N** mails the audience. Anyone who already received that campaign is skipped, so a second send tops up a list that has grown rather than mailing everyone twice.
 - Audiences are everyone / claimed / not-yet-claimed / approved. Two exclusions apply to all of them and are not selectable: members who opted out, and `inactive` profiles.
 
+### Campaign analytics
+
+Campaign reporting now includes delivery, open and button-click rates, individual
+recipient activity and CSV export. Gomry event registrations (free RSVPs and paid
+tickets) are matched to campaign clicks when you sync registrations in the report.
+See [campaign analytics setup](docs/marketing-analytics.md) for Resend webhook/DNS
+configuration, conversion rules, and local verification commands.
+
 ### Unsubscribe
 
 Every campaign carries an opt-out — in the footer, and in the `List-Unsubscribe` / `List-Unsubscribe-Post` headers Gmail and Apple Mail surface as their own button.

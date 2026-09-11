@@ -8,6 +8,7 @@ import sponsorRoutes from './routes/sponsor.js';
 import eventsRoutes from './routes/events.js';
 import adminAuthRoutes from './routes/adminAuth.js';
 import partnersRoutes from './routes/partners.js';
+import marketingRoutes from './routes/marketing.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,6 +18,8 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }));
+// Resend signs raw bytes. Mount its router before the JSON parser.
+app.use('/api/marketing', express.raw({ type: '*/*', limit: '256kb' }), marketingRoutes);
 app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 
 // Routes

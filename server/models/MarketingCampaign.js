@@ -32,10 +32,12 @@ const marketingCampaignSchema = new mongoose.Schema({
   promoCode: { type: String, trim: true, maxlength: 60, default: '' },
   promoNote: { type: String, trim: true, maxlength: 200, default: '' },
   audience: { type: String, enum: AUDIENCES, default: 'all' },
+  conversionGoal: { type: String, enum: ['none', 'registration', 'profile_claim'], default: 'none' },
   // draft → never sent; sent → at least one real send has happened. There is no
   // 'sending' state: a send is one request that either finishes or doesn't.
   status: { type: String, enum: ['draft', 'sent'], default: 'draft' },
   lastSentAt: { type: Date, default: null },
+  analyticsSyncedAt: { type: Date, default: null },
   sentCount: { type: Number, default: 0 },
   failedCount: { type: Number, default: 0 },
   // Everyone this campaign has actually reached. Kept so a second send can skip

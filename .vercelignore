@@ -1,0 +1,14 @@
+.git
+.vercel
+.claude
+.linkedin-session
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+itc-contacts.csv
+tests
+scripts
+*.log
+.DS_Store

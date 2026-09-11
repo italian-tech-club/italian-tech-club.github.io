@@ -22,6 +22,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 const Unsubscribe = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('u') || '';
+  const deliveryId = searchParams.get('d') || '';
 
   const [state, setState] = useState('working'); // working | done | resubscribed | invalid | error
   const [email, setEmail] = useState('');
@@ -29,7 +30,7 @@ const Unsubscribe = () => {
   const ran = useRef(false);
 
   const call = async (resubscribe) => {
-    const response = await fetch(`${API_URL}/api/community/unsubscribe?u=${encodeURIComponent(token)}`, {
+    const response = await fetch(`${API_URL}/api/community/unsubscribe?u=${encodeURIComponent(token)}&d=${encodeURIComponent(deliveryId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resubscribe }),

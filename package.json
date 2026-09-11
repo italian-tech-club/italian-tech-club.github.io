@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:marketing": "node --test tests/marketing.test.js",
+    "test:marketing-ui": "node tests/marketing-browser.mjs",
     "preview": "vite preview",
     "server": "node server/index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
@@ -42,6 +44,7 @@
     "playwright-core": "^1.61.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.1.5"
+    "vite": "^5.1.5",
+    "mongodb-memory-server-core": "^11.2.0"
   }
 }

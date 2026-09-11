@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import MarketingAnalytics from './MarketingAnalytics';
 import {
   Loader2, Send, Mail, Plus, Trash2, Save, Eye, RefreshCw, Users, MailX, AlertCircle, Check,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ const BLANK = {
   promoCode: '',
   promoNote: '',
   audience: 'all',
+  conversionGoal: 'registration',
 };
 
 const AUDIENCES = [
@@ -139,7 +141,7 @@ const AdminMarketing = ({ authHeaders, onUnauthorized }) => {
 
   const openCampaign = (campaign) => {
     setEditingId(campaign._id);
-    setDraft({ ...BLANK, ...campaign, eventId: campaign.eventId || '' });
+    setDraft({ ...BLANK, ...campaign, conversionGoal: campaign.conversionGoal || 'none', eventId: campaign.eventId || '' });
     setMessage('');
   };
 
@@ -294,6 +296,8 @@ const AdminMarketing = ({ authHeaders, onUnauthorized }) => {
         )}
       </section>
 
+      {current && <MarketingAnalytics key={current._id} campaign={current} authHeaders={authHeaders} onUnauthorized={onUnauthorized} />}
+
       {/* Composer */}
       <section className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-5">
         <div className="flex items-center gap-2">
@@ -331,6 +335,15 @@ const AdminMarketing = ({ authHeaders, onUnauthorized }) => {
 
         <Field label="Subject" hint="{{firstName}} works here too">
           <input value={draft.subject} onChange={set('subject')} placeholder="Ciao {{firstName}}, ci vediamo il 23?" className={INPUT} />
+        </Field>
+
+        <Field label="Conversion goal" hint="applies to future sends">
+          <select value={draft.conversionGoal} onChange={set('conversionGoal')} className={INPUT}>
+            <option value="none">Engagement only</option>
+            <option value="registration">Event RSVP or ticket (Gomry / Luma)</option>
+            <option value="profile_claim">First member profile claim</option>
+          </select>
+          <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Conversions count completed actions within 30 days of a recorded button click. Use the Gomry or Luma event URL as the button link; registration sync needs access to that event platform.</p>
         </Field>
 
         <Field label="Preheader" hint="the grey line after the subject in the inbox">

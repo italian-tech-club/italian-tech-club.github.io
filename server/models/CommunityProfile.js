@@ -143,6 +143,7 @@ const communityProfileSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  claimedAt: { type: Date, default: null },
   // When the claim/welcome email was last sent to this member, and how many
   // times total. Powers the admin claim-campaign dashboard ("emailed 2d ago",
   // "never emailed") and guards against accidental double-sends.

@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import MarketingDelivery from '../../server/models/MarketingDelivery.js';
+import { recordConversion, recordCampaignUnsubscribe } from '../../server/utils/marketingAnalytics.js';
 // Pure fetch/mapping helpers — no mongoose, so importing them here cannot
 // collide with this file's own model registrations.
 import {
@@ -92,6 +94,7 @@ const communityProfileSchema = new mongoose.Schema({
   isFounder: { type: Boolean, default: false },
   seeded: { type: Boolean, default: false },
   claimed: { type: Boolean, default: false },
+  claimedAt: { type: Date, default: null },
   lastClaimEmailAt: { type: Date, default: null },
   claimEmailCount: { type: Number, default: 0 },
   gdprConsent: { type: Boolean, default: false },
@@ -216,8 +219,10 @@ const marketingCampaignSchema = new mongoose.Schema({
   promoCode: { type: String, trim: true, maxlength: 60, default: '' },
   promoNote: { type: String, trim: true, maxlength: 200, default: '' },
   audience: { type: String, enum: ['all', 'claimed', 'unclaimed', 'approved'], default: 'all' },
+  conversionGoal: { type: String, enum: ['none', 'registration', 'profile_claim'], default: 'none' },
   status: { type: String, enum: ['draft', 'sent'], default: 'draft' },
   lastSentAt: { type: Date, default: null },
+  analyticsSyncedAt: { type: Date, default: null },
   sentCount: { type: Number, default: 0 },
   failedCount: { type: Number, default: 0 },
   recipients: {
@@ -417,15 +422,22 @@ function maskEmail(email) {
 // unconsented profiles become approved (consent recorded); new self-submissions
 // ('pending') stay pending until an admin approves.
 async function applyClaim(profile) {
+  const firstClaim = !profile.claimed;
   let changed = false;
   if (!profile.emailVerified) { profile.emailVerified = true; changed = true; }
-  if (!profile.claimed) { profile.claimed = true; changed = true; }
+  if (!profile.claimed) { profile.claimed = true; profile.claimedAt = new Date(); changed = true; }
   if (profile.status === 'unclaimed') {
     profile.status = 'approved';
     profile.gdprConsent = true;
     changed = true;
   }
   if (changed) await profile.save();
+  if (firstClaim) {
+    await recordConversion({ Delivery: MarketingDelivery, profileId: profile._id, goal: 'profile_claim',
+      occurredAt: profile.claimedAt, source: 'profile_claim', reference: `claim:${profile._id}` }).catch((error) => {
+      console.error('Marketing claim attribution failed:', error.message);
+    });
+  }
 }
 
 // Mirrors the allowlist in /api/admin/auth — a member session only carries
@@ -1459,7 +1471,7 @@ async function handleMarketing(req, res) {
     const { action, campaignId } = req.body || {};
 
     if (action === 'save') {
-      const data = pickCampaignFields(req.body.campaign || {});
+      const data = pickCampaignFields(req.body.campaign || {}, { validateGoal: true });
       if (!data.name?.trim() || !data.subject?.trim()) {
         return res.status(400).json({ success: false, message: 'A campaign needs a name and a subject.' });
       }
@@ -1473,6 +1485,7 @@ async function handleMarketing(req, res) {
     if (action === 'delete') {
       const campaign = await MarketingCampaign.findByIdAndDelete(campaignId);
       if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found' });
+      await MarketingDelivery.deleteMany({ campaignId });
       return res.status(200).json({ success: true, message: 'Campaign deleted.' });
     }
 
@@ -1505,6 +1518,7 @@ async function handleMarketing(req, res) {
         campaign,
         CommunityProfile,
         Event,
+        Delivery: MarketingDelivery,
         siteUrl: SITE_URL,
         skipAlreadySent: req.body.skipAlreadySent !== false,
       });
@@ -1550,6 +1564,7 @@ async function handleUnsubscribe(req, res) {
     profile.marketingOptOut = optOut;
     profile.marketingOptOutAt = optOut ? new Date() : null;
     await profile.save();
+    await recordCampaignUnsubscribe({ Delivery: MarketingDelivery, profileId: profile._id, deliveryId: req.query.d, optOut });
 
     return res.status(200).json({ success: true, found: true, email: maskEmail(profile.email), optedOut: optOut });
   }
@@ -1953,6 +1968,7 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Error:', error);
+    if (error.status === 400) return res.status(400).json({ success: false, message: error.message });
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'A profile with this email already exists.' });
     }

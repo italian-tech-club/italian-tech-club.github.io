@@ -109,6 +109,7 @@ export async function sendEmailBatch(messages) {
     ...(m.replyTo ? { reply_to: m.replyTo } : {}),
     ...(m.bcc?.length ? { bcc: m.bcc } : {}),
     ...(m.headers ? { headers: m.headers } : {}),
+    ...(m.tags ? { tags: m.tags } : {}),
   }));
 
   try {
@@ -125,7 +126,10 @@ export async function sendEmailBatch(messages) {
       console.error('Resend batch API error:', response.status, await response.text());
       return { ok: false, results: messages.map((m) => ({ to: m.to, ok: false })) };
     }
-    return { ok: true, results: messages.map((m) => ({ to: m.to, ok: true })) };
+    // Acceptance is already confirmed by the successful response. A malformed
+    // response body must not label sent mail as failed and invite a duplicate.
+    const data = await response.json().catch(() => ({}));
+    return { ok: true, results: messages.map((m, i) => ({ to: m.to, ok: true, id: data.data?.[i]?.id })) };
   } catch (error) {
     console.error('Resend batch exception:', error);
     return { ok: false, results: messages.map((m) => ({ to: m.to, ok: false })) };
