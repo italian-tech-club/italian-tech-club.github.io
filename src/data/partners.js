@@ -28,7 +28,7 @@ export const PARTNERS = [
     name: 'Transatlantic Innovation Hub',
     shortName: 'TIH',
     tagline: 'powered by ATLAS',
-    url: 'https://tihny.com',
+    url: 'https://tihny.com/',
     location: 'Manhattan, New York',
     // Only asset we have is the white-wordmark variant, so the logo always sits
     // on a dark tile — in both themes.

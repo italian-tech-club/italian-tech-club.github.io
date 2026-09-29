@@ -17,6 +17,11 @@ const PartnerCard = ({ partner }) => {
     ...(partner.access || []).map((item) => ({ key: item.title, icon: Sparkles, text: item.title })),
   ];
   const detailPath = `/partners/${partner.slug}`;
+  // One outbound action per card: the partner's signup when they have one,
+  // otherwise their site.
+  const action = partner.signup
+    ? { label: partner.signup.shortLabel || partner.signup.label, href: partner.signup.url }
+    : { label: 'Website', href: partner.url };
 
   return (
     <motion.div
@@ -58,16 +63,14 @@ const PartnerCard = ({ partner }) => {
                 : 'Events & access'}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-            {partner.signup && (
-              <a
-                href={partner.signup.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-7 items-center gap-1.5 rounded-full bg-slate-900 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-itc-green dark:bg-white dark:text-slate-900 dark:hover:bg-itc-green dark:hover:text-white"
-              >
-                {partner.signup.shortLabel || partner.signup.label} <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            )}
+            <a
+              href={action.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-7 items-center gap-1.5 rounded-full bg-slate-900 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-itc-green dark:bg-white dark:text-slate-900 dark:hover:bg-itc-green dark:hover:text-white"
+            >
+              {action.label} <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
         </div>
       </div>

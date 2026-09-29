@@ -1172,6 +1172,7 @@ export const EDGES = [
   // ITC NYC
   { a: ITC_ID, b: 'itc-global', kind: 'network', note: 'NYC is a chapter of the Italian Tech Club network.' },
   { a: ITC_ID, b: 'tih', kind: 'partner', note: 'Member-perk partner since August 2026.' },
+  { a: ITC_ID, b: 'iic-ny', kind: 'partner', note: 'Partner since September 2026: talks, visiting Italian experts and cultural programming.' },
   { a: ITC_ID, b: 'tih', kind: 'venue', note: 'Our December 2025 Tech Talk ran in this space, then Impact Hub New York.' },
   { a: ITC_ID, b: 'uis', kind: 'cohost', note: 'ITC x UIS: Meet & Eat, La Piadineria, February 2026.' },
   { a: ITC_ID, b: 'i3nyc', kind: 'cohost', note: 'December 2025 Tech Talk with I³ chair Gianluca Galletto at 417 Fifth Avenue.' },
