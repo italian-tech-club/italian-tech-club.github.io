@@ -17,7 +17,7 @@ import {
 import ThemeToggle from './ThemeToggle';
 import SectionEyebrow from './SectionEyebrow';
 import PartnerLogo from './PartnerLogo';
-import { listedPartners, activeBenefits } from '../data/partners';
+import { perkPartners, activeBenefits } from '../data/partners';
 import { getCommunitySession, memberAuthHeaders, clearMemberSession } from '../lib/memberSession';
 import { fadeRise, staggerContainer, VIEWPORT } from '../lib/motion';
 
@@ -171,7 +171,7 @@ const CommunityPerks = () => {
     }
   };
 
-  const partners = listedPartners();
+  const partners = perkPartners();
   const perkCount = partners.reduce((total, partner) => total + activeBenefits(partner).length, 0);
 
   return (

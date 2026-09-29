@@ -311,10 +311,14 @@ export const ORGS = [
     url: 'https://iicnewyork.esteri.it',
     city: '686 Park Avenue, New York, NY',
     since: '1961',
-    tie: 'none',
+    tie: 'partner',
+    tieNote:
+      'Partner since September 2026: opens the community to its talks (AI4Progress among them), visiting Italian experts and cultural programming.',
+    logo: '/images/partners/istituto-italiano-di-cultura-white.png',
+    logoOnDark: true,
     blurb:
       "Italy's official cultural institute in New York — language courses, a 30,000-volume library, film festivals and a hall that hosts the community's more institutional evenings.",
-    tags: ['culture', 'government', 'venue'],
+    tags: ['culture', 'government', 'venue', 'partner'],
   },
   {
     id: 'ita-ny',

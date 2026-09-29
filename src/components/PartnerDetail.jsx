@@ -6,8 +6,10 @@ import {
   ArrowRight,
   ExternalLink,
   Handshake,
+  Mail,
   MapPin,
   Repeat,
+  Sparkles,
   Ticket,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
@@ -18,8 +20,8 @@ import { getCommunitySession } from '../lib/memberSession';
 import { fadeRise, staggerContainer, VIEWPORT } from '../lib/motion';
 
 // A partner's own page — shareable, so we can send a partner the URL of the page
-// about them. Describes the perks; the codes themselves live behind the member
-// wall at /community/perks.
+// about them. Describes the perks and open access; the codes themselves live
+// behind the member wall at /community/perks.
 const PartnerDetail = () => {
   const { slug } = useParams();
   const partner = findPartner(slug);
@@ -28,6 +30,7 @@ const PartnerDetail = () => {
   if (!partner) return <NotFound />;
 
   const benefits = activeBenefits(partner);
+  const access = partner.access || [];
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 transition-colors duration-300 dark:bg-slate-950">
@@ -83,70 +86,126 @@ const PartnerDetail = () => {
           </div>
         </motion.div>
 
-        {/* What they hold open for members */}
-        <h2 className="mb-4 mt-14 text-lg font-bold text-slate-900 dark:text-white">
-          What {partner.shortName} offers ITC members
-        </h2>
-        <motion.div
-          variants={staggerContainer(0.1)}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="space-y-4"
-        >
-          {benefits.map((benefit) => (
+        {/* Open access — no code needed */}
+        {access.length > 0 && (
+          <>
+            <h2 className="mb-4 mt-14 text-lg font-bold text-slate-900 dark:text-white">
+              What {partner.shortName} opens up for the community
+            </h2>
             <motion.div
-              key={benefit.id}
-              variants={fadeRise}
-              className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
+              variants={staggerContainer(0.1)}
+              initial="hidden"
+              whileInView="show"
+              viewport={VIEWPORT}
+              className="grid gap-4 sm:grid-cols-3"
             >
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-full bg-itc-green px-3 py-1 text-sm font-bold text-white">
-                  {benefit.discount}
-                </span>
-                <h3 className="text-lg font-bold leading-tight text-slate-900 dark:text-white">
-                  {benefit.title}
-                </h3>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                {benefit.details}
-              </p>
-              <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {benefit.oneTime ? <Ticket className="h-3.5 w-3.5" /> : <Repeat className="h-3.5 w-3.5" />}
-                {benefit.eligibility}
-              </p>
+              {access.map((item) => (
+                <motion.div
+                  key={item.title}
+                  variants={fadeRise}
+                  className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <Sparkles className="h-5 w-5 text-itc-green" />
+                  <h3 className="mt-3 font-bold leading-tight text-slate-900 dark:text-white">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                    {item.details}
+                  </p>
+                </motion.div>
+              ))}
             </motion.div>
-          ))}
-        </motion.div>
+          </>
+        )}
 
-        {/* Route to the codes */}
-        <motion.div
-          variants={fadeRise}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="mt-10 rounded-3xl bg-slate-900 p-6 text-center text-white sm:p-8 dark:bg-black"
-        >
-          <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-300">
-            {signedIn
-              ? `Your personal ${partner.shortName} codes are in the community area — send one over when you sign up and they'll confirm you're a current ITC member.`
-              : `These are ITC member perks. Join the community and you get a personal code for each one — ${partner.shortName} checks it against our roster.`}
-          </p>
-          <Link
-            to={signedIn ? '/community/perks' : '/community/join'}
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 font-semibold text-slate-900 transition-all hover:-translate-y-1 hover:bg-itc-green hover:text-white"
+        {/* How to get in on it */}
+        {partner.signup && (
+          <motion.div
+            variants={fadeRise}
+            initial="hidden"
+            whileInView="show"
+            viewport={VIEWPORT}
+            className="mt-10 rounded-3xl bg-slate-900 p-6 text-center text-white sm:p-8 dark:bg-black"
           >
-            {signedIn ? 'See my perk codes' : 'Apply to Join'} <ArrowRight className="h-5 w-5" />
-          </Link>
-          {!signedIn && (
-            <p className="mt-4 text-xs text-slate-400">
-              Already a member?{' '}
-              <Link to="/community/manage" className="font-medium text-white hover:underline">
-                Sign in
+            <Mail className="mx-auto h-7 w-7 text-itc-green" />
+            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-slate-300">{partner.signup.blurb}</p>
+            <a
+              href={partner.signup.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 font-semibold text-slate-900 transition-all hover:-translate-y-1 hover:bg-itc-green hover:text-white"
+            >
+              {partner.signup.label} <ExternalLink className="h-5 w-5" />
+            </a>
+          </motion.div>
+        )}
+
+        {/* What they hold open for members */}
+        {benefits.length > 0 && (
+          <>
+            <h2 className="mb-4 mt-14 text-lg font-bold text-slate-900 dark:text-white">
+              What {partner.shortName} offers ITC members
+            </h2>
+            <motion.div
+              variants={staggerContainer(0.1)}
+              initial="hidden"
+              whileInView="show"
+              viewport={VIEWPORT}
+              className="space-y-4"
+            >
+              {benefits.map((benefit) => (
+                <motion.div
+                  key={benefit.id}
+                  variants={fadeRise}
+                  className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-full bg-itc-green px-3 py-1 text-sm font-bold text-white">
+                      {benefit.discount}
+                    </span>
+                    <h3 className="text-lg font-bold leading-tight text-slate-900 dark:text-white">
+                      {benefit.title}
+                    </h3>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                    {benefit.details}
+                  </p>
+                  <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {benefit.oneTime ? <Ticket className="h-3.5 w-3.5" /> : <Repeat className="h-3.5 w-3.5" />}
+                    {benefit.eligibility}
+                  </p>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Route to the codes */}
+            <motion.div
+              variants={fadeRise}
+              initial="hidden"
+              whileInView="show"
+              viewport={VIEWPORT}
+              className="mt-10 rounded-3xl bg-slate-900 p-6 text-center text-white sm:p-8 dark:bg-black"
+            >
+              <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-300">
+                {signedIn
+                  ? `Your personal ${partner.shortName} codes are in the community area — send one over when you sign up and they'll confirm you're a current ITC member.`
+                  : `These are ITC member perks. Join the community and you get a personal code for each one — ${partner.shortName} checks it against our roster.`}
+              </p>
+              <Link
+                to={signedIn ? '/community/perks' : '/community/join'}
+                className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 font-semibold text-slate-900 transition-all hover:-translate-y-1 hover:bg-itc-green hover:text-white"
+              >
+                {signedIn ? 'See my perk codes' : 'Apply to Join'} <ArrowRight className="h-5 w-5" />
               </Link>
-            </p>
-          )}
-        </motion.div>
+              {!signedIn && (
+                <p className="mt-4 text-xs text-slate-400">
+                  Already a member?{' '}
+                  <Link to="/community/manage" className="font-medium text-white hover:underline">
+                    Sign in
+                  </Link>
+                </p>
+              )}
+            </motion.div>
+          </>
+        )}
       </div>
     </div>
   );

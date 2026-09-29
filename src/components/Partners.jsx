@@ -1,67 +1,24 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Home, ArrowRight, ArrowUpRight, Lock, Ticket, MapPin } from 'lucide-react';
+import { Home, ArrowRight, Lock, Ticket } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import SectionEyebrow from './SectionEyebrow';
-import PartnerLogo from './PartnerLogo';
-import { listedPartners, activeBenefits } from '../data/partners';
+import PartnerCard from './PartnerCard';
+import { listedPartners, perkPartners } from '../data/partners';
 import { getCommunitySession } from '../lib/memberSession';
 import { fadeRise, staggerContainer, VIEWPORT } from '../lib/motion';
 
-const HOW_IT_WORKS = [
-  {
-    title: 'Join the community',
-    body: 'Perks ride along with ITC membership. One application, and every partner offer opens up.',
-  },
-  {
-    title: 'Unlock your code',
-    body: 'One code per perk, tied to your member profile. It never changes, so you only do this once.',
-  },
-  {
-    title: 'The partner checks it',
-    body: 'They look the code up and see you are a current ITC member. That is the whole handshake.',
-  },
+// Only code-based perks need explaining; open access is just a link.
+const HOW_CODES_WORK = [
+  'Join the community',
+  'Unlock your personal code',
+  'The partner checks it against our roster',
 ];
-
-// A partner in the wall. Uniform tile regardless of how many perks they carry —
-// the wall has to read as a set, not a ranking.
-const PartnerCard = ({ partner }) => {
-  const perkCount = activeBenefits(partner).length;
-
-  return (
-    <motion.div
-      variants={fadeRise}
-      className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
-    >
-      <Link
-        to={`/partners/${partner.slug}`}
-        className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition-[border-color,box-shadow,transform] duration-300 ease-out-quint hover:-translate-y-1 hover:border-itc-green/50 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900"
-      >
-        <PartnerLogo partner={partner} className="rounded-none py-8" imageClassName="max-h-11" />
-        <div className="flex flex-1 flex-col p-5">
-          <h2 className="font-bold leading-tight text-slate-900 dark:text-white">{partner.name}</h2>
-          {partner.location && (
-            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <MapPin className="h-3.5 w-3.5" /> {partner.location}
-            </p>
-          )}
-          <div className="mt-4 flex items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-itc-green">
-              <Ticket className="h-3.5 w-3.5" />
-              {perkCount} member perk{perkCount === 1 ? '' : 's'}
-            </span>
-            <ArrowUpRight className="h-4 w-4 text-slate-300 transition-colors group-hover:text-itc-green dark:text-slate-600" />
-          </div>
-        </div>
-      </Link>
-    </motion.div>
-  );
-};
 
 const Partners = () => {
   const partners = listedPartners();
-  const perkCount = partners.reduce((total, partner) => total + activeBenefits(partner).length, 0);
+  const hasCodePerks = perkPartners().length > 0;
   // Local token only — no request. A stale one just means the perks page asks
   // them to sign in again, which is the right place for that conversation.
   const signedIn = !!getCommunitySession();
@@ -94,8 +51,8 @@ const Partners = () => {
             <span className="bg-gradient-to-r from-itc-green to-itc-red bg-clip-text text-transparent"> build with</span>
           </h1>
           <p className="mx-auto max-w-2xl px-4 text-base text-slate-600 dark:text-slate-400 sm:text-lg">
-            Organizations working alongside Italian Tech Club NYC — and the {perkCount} perk
-            {perkCount === 1 ? '' : 's'} they hold open for our members.
+            Organizations working alongside Italian Tech Club NYC — the perks, events and people they open
+            up for our members.
           </p>
         </motion.div>
 
@@ -112,27 +69,30 @@ const Partners = () => {
           ))}
         </motion.div>
 
-        {/* How perks work */}
-        <motion.div
-          variants={fadeRise}
-          initial="hidden"
-          whileInView="show"
-          viewport={VIEWPORT}
-          className="rounded-3xl bg-slate-900 p-6 text-white sm:p-10 dark:bg-black"
-        >
-          <h2 className="text-xl font-bold sm:text-2xl">How member perks work</h2>
-          <div className="mt-6 grid gap-6 sm:grid-cols-3">
-            {HOW_IT_WORKS.map((step, index) => (
-              <div key={step.title}>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-itc-green text-sm font-bold text-white">
-                  {index + 1}
-                </span>
-                <h3 className="mt-3 font-semibold">{step.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{step.body}</p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+        {/* How code perks work — compact, since not every partner has codes */}
+        {hasCodePerks && (
+          <motion.div
+            variants={fadeRise}
+            initial="hidden"
+            whileInView="show"
+            viewport={VIEWPORT}
+            className="flex flex-col gap-4 rounded-3xl bg-slate-900 p-6 text-white sm:p-8 md:flex-row md:items-center dark:bg-black"
+          >
+            <h2 className="flex shrink-0 items-center gap-2 font-bold">
+              <Ticket className="h-5 w-5 text-itc-green" /> How perk codes work
+            </h2>
+            <ol className="flex flex-1 flex-col gap-3 md:flex-row md:justify-end md:gap-6">
+              {HOW_CODES_WORK.map((step, index) => (
+                <li key={step} className="flex items-center gap-2.5 text-sm text-slate-300 md:whitespace-nowrap">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-itc-green text-xs font-bold text-white">
+                    {index + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </motion.div>
+        )}
 
         {/* Join CTA — the whole point of this page for a visitor */}
         <motion.div
@@ -144,12 +104,12 @@ const Partners = () => {
         >
           <Lock className="mx-auto mb-3 h-8 w-8 text-itc-green" />
           <h2 className="mb-3 text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">
-            Perks come with membership
+            Membership opens every door
           </h2>
           <p className="mx-auto mb-6 max-w-md text-sm text-slate-600 dark:text-slate-400 sm:text-base">
             {signedIn
-              ? 'You are signed in — your codes are waiting in the community area.'
-              : 'Already one of us? Sign in with your email — no password needed. New here? Apply to join and the codes come with it.'}
+              ? 'You are signed in — your perk codes are waiting in the community area.'
+              : 'Already one of us? Sign in with your email — no password needed. New here? Apply to join and every partner perk comes with it.'}
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             {signedIn ? (
@@ -179,7 +139,7 @@ const Partners = () => {
         </motion.div>
 
         <p className="mt-10 text-center text-xs text-slate-400 dark:text-slate-500">
-          Want to offer a benefit to the club?{' '}
+          Want to partner with the club?{' '}
           <a href="mailto:ciao@italiantechclubnyc.com" className="font-medium text-itc-green hover:underline">
             ciao@italiantechclubnyc.com
           </a>

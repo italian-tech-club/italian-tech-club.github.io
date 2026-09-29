@@ -6,6 +6,13 @@
 // Adding a partner = add an entry here, drop the logo in public/images/partners,
 // commit. Nothing else to wire up.
 //
+// Two kinds of value a partner can bring, and a partner can carry either or both:
+//   - `benefits`: member-only perks, each claimed as a personal code the partner
+//     verifies against the roster.
+//   - `access`: open doors that need no code — programming, people, events —
+//     plus an optional `signup` link (a newsletter, a mailing list) that is how
+//     members actually get in on them.
+//
 // Benefit ids are stored on every issued claim — never rename or reuse one, or
 // codes already in members' hands stop resolving. Retire a benefit with
 // `active: false` instead of deleting it, so old codes still verify.
@@ -59,12 +66,56 @@ export const PARTNERS = [
       },
     ],
   },
+  {
+    slug: 'iic-new-york',
+    name: 'Istituto Italiano di Cultura di New York',
+    shortName: 'IIC New York',
+    tagline: 'Italian Cultural Institute of New York',
+    url: 'https://iicnewyork.esteri.it/it/',
+    location: '686 Park Avenue, New York',
+    // White wordmark only, same as TIH — dark tile in both themes.
+    logo: '/images/partners/istituto-italiano-di-cultura-white.png',
+    logoOnDark: true,
+    partnerSince: 'September 2026',
+    blurb:
+      "Italy's official cultural institute in New York. The Institute opens the community to opportunities beyond networking: culture, education, research, institutions, and professional development.",
+    benefits: [],
+    access: [
+      {
+        title: 'Talks on AI, science and innovation',
+        details:
+          'High-level events and talks on AI, science, innovation, design, business, and contemporary Italian culture, including series such as AI4Progress.',
+      },
+      {
+        title: 'Italian experts in New York',
+        details:
+          'Opportunities to meet Italian experts, researchers, academics, entrepreneurs and institutional figures visiting or working in New York.',
+      },
+      {
+        title: 'Culture, not just careers',
+        details:
+          'Exhibitions, screenings, lectures, performances, book presentations, and other events that make ITC more than purely a professional networking community.',
+      },
+    ],
+    signup: {
+      label: 'Subscribe to the IIC newsletter',
+      shortLabel: 'Newsletter',
+      url: 'https://lp.constantcontactpages.com/sl/t3C0lk4/iicnynewslettersignup',
+      blurb: 'Every talk, screening and exhibition the Institute runs lands here first.',
+    },
+  },
 ];
 
 export const activeBenefits = (partner) => partner.benefits.filter((benefit) => benefit.active);
 
-// Partners worth listing publicly: at least one live perk to offer.
-export const listedPartners = () => PARTNERS.filter((partner) => activeBenefits(partner).length > 0);
+const hasAccess = (partner) => (partner.access?.length ?? 0) > 0;
+
+// Partners worth listing publicly: a live perk or open access to offer.
+export const listedPartners = () =>
+  PARTNERS.filter((partner) => activeBenefits(partner).length > 0 || hasAccess(partner));
+
+// Partners with codes to claim — what the member perks area lists.
+export const perkPartners = () => PARTNERS.filter((partner) => activeBenefits(partner).length > 0);
 
 export const findPartner = (slug) => PARTNERS.find((partner) => partner.slug === slug) || null;
 
